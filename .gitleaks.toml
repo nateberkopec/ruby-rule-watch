@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Installed dependencies and generated bundles"
+paths = ['''(^|/)node_modules/''', '''(^|/)dist/''']

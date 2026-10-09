@@ -1,0 +1,23 @@
+{
+  "name": "ruby-rule-watch",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test:system": "node tests/system.mjs",
+    "lint": "oxlint --deny-warnings .",
+    "devvit": "devvit-cli"
+  },
+  "dependencies": {
+    "@devvit/public-api": "0.14.7",
+    "@noble/hashes": "2.4.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@devvit/cli": "0.14.7",
+    "@oxlint/plugins": "1.87.0",
+    "oxlint": "1.87.0",
+    "typescript": "~5.8.3"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "ruby-rule-watch",
+  "blocks": {
+    "entry": "src/main.ts"
+  },
+  "permissions": {
+    "reddit": true,
+    "redis": true,
+    "http": {
+      "enable": true,
+      "domains": ["api.openai.com"]
+    }
+  }
+}
