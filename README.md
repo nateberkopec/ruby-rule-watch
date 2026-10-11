@@ -6,7 +6,7 @@ A moderator-only Devvit automation app for /r/ruby. It uses OpenAI's Decisions A
 
 ## Development
 
-Tool versions are managed by `mise.toml` (Node.js 26.10.0, Devvit CLI 0.14.7, aube, gitleaks, hk and Pkl). Dependencies are pinned in `aube-lock.yaml` and installed with [aube](https://aube.sh). The system-test harness requires Node.js 22.15+.
+Tool versions are managed by `mise.toml` (Node.js 26.10.0, Devvit CLI 0.14.7, aube, gitleaks, jactionlint, hk and Pkl). Dependencies are pinned in `aube-lock.yaml` and installed with [aube](https://aube.sh). The system-test harness requires Node.js 22.15+.
 
 ```fish
 mise trust
@@ -19,7 +19,7 @@ mise run build
 devvit-cli --help
 ```
 
-`lint` runs TypeScript, Dillon Mulroy's AntiSlop rules and a redacted gitleaks working-tree scan. All 18 generic AntiSlop rules are enabled; source/tests/local configuration are linted, while upstream vendored code is excluded as upstream recommends. Provenance and licenses are in `tools/oxlint/anti-slop/`. Oxlint and `@oxlint/plugins` are pinned together. No rules are disabled to accommodate application findings; external API and stored JSON are validated with Zod.
+`lint` runs TypeScript, Dillon Mulroy's AntiSlop rules, a redacted gitleaks working-tree scan and [jactionlint](https://github.com/jdx/jactionlint) on the GitHub Actions workflow. All 18 generic AntiSlop rules are enabled; source/tests/local configuration are linted, while upstream vendored code is excluded as upstream recommends. Provenance and licenses are in `tools/oxlint/anti-slop/`. Oxlint and `@oxlint/plugins` are pinned together. No rules are disabled to accommodate application findings; external API and stored JSON are validated with Zod.
 
 hk runs the standard lint and test tasks on pre-commit and `hk check`, using your managed user hooks. GitHub Actions runs lint, test and build on every push and pull request. Mise loads `.env`; no local environment variables are required, so `.env.example` is intentionally empty. The OpenAI key stays in Devvit's encrypted app settings, never `.env`. `build` writes an ignored local actor bundle to `dist/` without uploading or installing it. There is no local server/serve task: Devvit playtesting would install the app and must be separately authorized.
 

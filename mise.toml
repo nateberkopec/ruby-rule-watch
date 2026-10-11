@@ -5,6 +5,7 @@ hk = "2.4.0"
 pkl = "0.32.1"
 aube = "2.6.1"
 gitleaks = "8.30.1"
+"github:jdx/jactionlint" = "2.1.0"
 
 [env]
 _.file = ".env"
@@ -16,7 +17,7 @@ run = "npm run test:system"
 
 [tasks.lint]
 description = "Run all lint checks"
-depends = ["lint:types", "lint:antislop", "lint:secrets"]
+depends = ["lint:types", "lint:antislop", "lint:secrets", "lint:actions"]
 
 [tasks."lint:types"]
 description = "Check TypeScript"
@@ -27,6 +28,11 @@ run = "npm run check"
 description = "Run Dillon Mulroy's anti-slop rules"
 sources = ["src/**/*.ts", "tests/**/*.mjs", "tools/oxlint/anti-slop/**/*", "oxlint.config.ts", "package.json", "aube-lock.yaml"]
 run = "npm run lint"
+
+[tasks."lint:actions"]
+description = "Check GitHub Actions workflows with jactionlint"
+sources = [".github/**/*.yml"]
+run = "jactionlint"
 
 [tasks."lint:secrets"]
 description = "Scan the working tree for plaintext secrets"
