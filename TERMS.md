@@ -1,14 +1,12 @@
 # Ruby Rule Watch terms
 
-Draft for moderator review and hosting before installation.
-
-Ruby Rule Watch is a moderation-assistance tool for authorized subreddit moderators. It identifies possible rule violations and sends private review information. All moderation decisions remain with human moderators.
+Ruby Rule Watch is a moderation-assistance tool for authorized subreddit moderators. It identifies possible rule violations, displays moderator-only reports, and can send private live alerts. All moderation decisions remain with human moderators.
 
 ## Authorized use
 
 Install and enable processing only with the mod team's approval and required Reddit platform permissions. Disclose external processing to the community. Use an authorized OpenAI API project and configure its secret through Devvit. The project owner is responsible for OpenAI charges and compliance with applicable Reddit and OpenAI terms.
 
-Access to moderator actions requires current moderator membership. Reports and alerts are addressed to `nateberkopec`. Do not broaden access or redistribute community data in ways inconsistent with the privacy policy and platform terms.
+Access to moderator actions requires current moderator membership. Reports are displayed privately to the requesting moderator. Live alerts are addressed to `nateberkopec`. Do not broaden access or redistribute community data in ways inconsistent with the privacy policy and platform terms.
 
 ## Limitations
 

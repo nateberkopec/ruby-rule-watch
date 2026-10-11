@@ -2,6 +2,7 @@ import type { TriggerContext } from '@devvit/public-api';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { assess, type Evidence } from './decisions.js';
+import { diagnosticFailure, failureMetadata } from './diagnostics.js';
 import { RULE_VERSION, ruleLabel, rules, type RuleName } from './rules.js';
 import { RETENTION_MS, saveAssessment, type Assessment } from './storage.js';
 import { getWorkPattern, isWorkThread } from './work-threads.js';
@@ -27,20 +28,27 @@ export async function subredditName(context: Pick<TriggerContext, 'subredditName
 }
 
 export async function watch(kind: 'post' | 'comment', id: string, context: TriggerContext): Promise<void> {
-  if (!(await context.settings.get<boolean>('processing-approved'))) return;
+  const approved = await context.settings.get<boolean>('processing-approved');
+  console.log('[DEBUG-rule-watch] processing_gate', { kind, id, approved: approved === true });
+
+  if (!approved) return;
   const lockKey = `processing:${id}`;
 
   const locked = await context.redis.set(lockKey, '1', {
     nx: true, expiration: new Date(Date.now() + 120_000),
   });
 
-  if (locked !== 'OK') return;
+  if (locked !== 'OK') {
+    console.log('[DEBUG-rule-watch] processing_lock_held', { id });
+
+    return;
+  }
 
   try {
     await evaluate(kind, id, context);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown failure';
-    console.error(`Rule Watch failed for ${id}: ${message}`);
+    diagnosticFailure('evaluation_failed', failureMetadata.parse(error));
+    console.error(`Rule Watch failed for ${id}`);
     throw new Error(`Rule Watch failed for ${id}`);
   } finally {
     await context.redis.del(lockKey);
@@ -55,12 +63,22 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
   if (item.subredditId !== context.subredditId) throw new Error('Wrong subreddit');
 
   if (item.removed || item.spam || ['[deleted]', '[removed]'].includes(item.body ?? '') ||
-      ['automoderator', context.appSlug.toLowerCase(), '[deleted]'].includes(item.authorName.toLowerCase())) return;
+      ['automoderator', context.appSlug.toLowerCase(), '[deleted]'].includes(item.authorName.toLowerCase())) {
+    console.log('[DEBUG-rule-watch] excluded_content', { id });
+
+    return;
+  }
+
   const comment = 'parentId' in item ? item : undefined;
   const post = 'title' in item ? item : await context.reddit.getPostById(item.postId);
   const body = item.body ?? '';
 
-  if (!normalize(`${kind === 'post' ? post.title : ''} ${body}`)) return;
+  if (!normalize(`${kind === 'post' ? post.title : ''} ${body}`)) {
+    console.log('[DEBUG-rule-watch] empty_content', { id });
+
+    return;
+  }
+
   const pattern = await getWorkPattern(context);
   const thresholds: Partial<Record<RuleName, number>> = {};
 
@@ -76,8 +94,14 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
   const seenKey = `seen:${id}`;
   const revision = `${contentDigest}:${configuration}`;
 
-  if (await context.redis.get(seenKey) === revision) return;
+  if (await context.redis.get(seenKey) === revision) {
+    console.log('[DEBUG-rule-watch] revision_unchanged', { id });
+
+    return;
+  }
+
   const key = await context.settings.get<string>('openai-api-key');
+  console.log('[DEBUG-rule-watch] key_available', { id, present: Boolean(key) });
 
   if (!key) throw new Error('OpenAI key is not configured');
 
@@ -133,6 +157,7 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
 
   await saveAssessment(record, context);
   await context.redis.set(seenKey, revision, { expiration: new Date(assessedAt + RETENTION_MS) });
+  console.log('[DEBUG-rule-watch] assessment_saved', { id, mode: record.mode, flaggedCount: flagged.length });
 
   if (record.mode !== 'live' || !flagged.length) return;
   const current = kind === 'post' ? await context.reddit.getPostById(id) : await context.reddit.getCommentById(id);

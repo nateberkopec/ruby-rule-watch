@@ -1,5 +1,6 @@
 [tools]
 node = "26.10.0"
+"npm:@devvit/cli" = "0.14.7"
 hk = "2.4.0"
 pkl = "0.32.1"
 
@@ -31,6 +32,6 @@ run = "gitleaks dir --redact=75 --no-banner --no-color --max-target-megabytes 5 
 
 [tasks.build]
 description = "Bundle the Devvit actor locally without uploading"
-sources = ["src/**/*.ts", "devvit.json", "package.json", "aube-lock.yaml"]
+sources = ["src/**/*.ts", "tests/bundle.mjs", "devvit.json", "package.json", "aube-lock.yaml"]
 outputs = ["dist/main.bundle.json"]
-run = "npm run devvit -- bundle actor"
+run = ["devvit-cli bundle actor", "node tests/bundle.mjs"]

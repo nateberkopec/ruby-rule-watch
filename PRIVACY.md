@@ -1,12 +1,10 @@
 # Ruby Rule Watch privacy policy
 
-Draft for moderator review and hosting before installation.
-
 ## Purpose and access
 
 Ruby Rule Watch helps subreddit moderators identify possible rule violations for human review. It does not automatically remove content, ban users, or make public replies. Processing is disabled until the installing moderators explicitly approve it. Shadow mode also requires approval.
 
-Only current subreddit moderators can request reports, record feedback, configure authorized work-thread recognition, or change delivery mode. Reports and alerts are sent to the Reddit account `nateberkopec`.
+Only current subreddit moderators can request reports, record feedback, configure authorized work-thread recognition, or change delivery mode. Reports are displayed privately to the requesting moderator in app forms. Live alerts are addressed to the Reddit account `nateberkopec`.
 
 ## Data processed
 
@@ -22,9 +20,11 @@ The app does not persist copies of source post/comment bodies. Digests are not g
 
 App error logs are intended to contain identifiers and error information, not source content. Logs are subject to Reddit's platform retention policies rather than the app's assessment cleanup.
 
-## Private messages
+## Reports and private messages
 
-Live alerts include short original-content excerpts and permalinks. Manually requested shadow reports include identifiers, links, rule labels and assessment metadata, but no body excerpts. Work-thread inspection reports include title, author and creation-time metadata. These Reddit messages are retained separately from Redis records and are not automatically deleted by the app's 30-day cleanup.
+Manually requested review reports are displayed in moderator-only app forms. They include identifiers, links, rule labels and assessment metadata, but no body excerpts. Work-thread inspection reports are also displayed in moderator-only forms and include title, author and creation-time metadata. Opening either report does not send a message or call OpenAI.
+
+Live alerts use Reddit private messages and include short original-content excerpts and permalinks. Delivered messages are retained separately from Redis records and are not automatically deleted by the app's 30-day cleanup. Private-message availability and actual receipt must be verified before live activation.
 
 ## OpenAI retention
 

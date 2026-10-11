@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { evaluationInstructions, rules, type RuleName } from './rules.js';
+import { diagnosticFailure, failureMetadata } from './diagnostics.js';
 
 const decisionResponse = z.object({
   answers: z.array(z.discriminatedUnion('type', [
@@ -24,6 +25,7 @@ export async function assess(
   workRuleEnabled: boolean,
 ): Promise<Partial<Record<RuleName, number>>> {
   const activeRules = rules.filter((rule) => workRuleEnabled || rule.name !== 'work_posts');
+  console.log('[DEBUG-rule-watch] decisions_request_started', { ruleCount: activeRules.length });
 
   const response = await fetch('https://api.openai.com/v1/decisions', {
     method: 'POST',
@@ -37,12 +39,21 @@ export async function assess(
         instructions: `${evaluationInstructions} ${rule.instructions}`,
       })),
     }),
+  }).catch((error) => {
+    diagnosticFailure('decisions_request_rejected', failureMetadata.parse(error));
+    throw error;
   });
+
+  console.log('[DEBUG-rule-watch] decisions_response', { status: response.status });
 
   if (!response.ok) throw new Error(`Decisions HTTP ${response.status}`);
   const parsed = decisionResponse.safeParse(await response.json());
 
-  if (!parsed.success) throw new Error('Invalid Decisions response');
+  if (!parsed.success) {
+    console.error('[DEBUG-rule-watch] decisions_response_invalid');
+    throw new Error('Invalid Decisions response');
+  }
+
   const result = parsed.data;
 
   const scores: Partial<Record<RuleName, number>> = {};
@@ -58,6 +69,8 @@ export async function assess(
 
     scores[rule.name] = answer.probability;
   }
+
+  console.log('[DEBUG-rule-watch] decisions_assessment_completed');
 
   return scores;
 }

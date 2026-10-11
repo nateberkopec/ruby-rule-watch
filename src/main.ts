@@ -1,5 +1,7 @@
-import { Devvit, type Context, type MenuItemOnPressEvent } from '@devvit/public-api';
+import { Devvit, type Context } from '@devvit/public-api';
+import { z } from 'zod';
 import { ruleLabel, rules } from './rules.js';
+import { diagnosticFailure, failureDisplay, failureMetadata, failureReason } from './diagnostics.js';
 import { cleanup, getAssessment, recentAssessments, saveAssessment } from './storage.js';
 import { LIVE_KEY, RECIPIENT, subredditName, watch } from './watch.js';
 import { getWorkPattern, isWorkThread, validateWorkPattern, WORK_PATTERN_KEY, type WorkPattern } from './work-threads.js';
@@ -39,24 +41,23 @@ async function requireModerator(context: Context): Promise<void> {
   }
 }
 
-function addMenu(label: string, location: 'subreddit' | ['post', 'comment'],
-  handler: (event: MenuItemOnPressEvent, context: Context) => Promise<void>): void {
-  Devvit.addMenuItem({
-    label, location, forUserType: 'moderator',
-    onPress: async (event, context) => {
-      try {
-        await requireModerator(context);
-        await handler(event, context);
-      } catch (error) {
-        context.ui.showToast(error instanceof Error ? error.message : 'Action failed');
-      }
-    },
-  });
+const failureForm = Devvit.createForm((data) => ({
+  title: 'Rule Watch action failed',
+  description: failureDisplay.parse(data),
+  fields: [],
+}), async (_event, context) => requireModerator(context));
+
+const actions: Array<{ label: string; handler: (context: Context) => Promise<void> }> = [];
+
+function addAction(label: string, handler: (context: Context) => Promise<void>): void {
+  actions.push({ label, handler });
 }
 
 Devvit.addTrigger({
   events: ['PostSubmit', 'PostCreate', 'PostUpdate', 'CommentSubmit', 'CommentCreate', 'CommentUpdate'],
   onEvent: async (event, context) => {
+    console.log('[DEBUG-rule-watch] trigger_received', { type: event.type });
+
     if (event.type.startsWith('Comment')) {
       if ('comment' in event && event.comment?.id) {
         const id = event.comment.id.startsWith('t1_') ? event.comment.id : `t1_${event.comment.id}`;
@@ -73,7 +74,14 @@ Devvit.addSchedulerJob({ name: 'expire-assessment-index', onRun: async (_event, 
 
 Devvit.addTrigger({
   events: ['AppInstall', 'AppUpgrade'],
-  onEvent: async (_event, context) => {
+  onEvent: async (event, context) => {
+    console.log('[DEBUG-rule-watch] lifecycle_received', { type: event.type });
+    const approved = await context.settings.get<boolean>('processing-approved');
+    const key = await context.settings.get<string>('openai-api-key');
+    console.log('[DEBUG-rule-watch] installation_state', {
+      approved: approved === true, keyPresent: Boolean(key),
+      mode: await context.redis.get(LIVE_KEY) === 'true' ? 'live' : 'shadow',
+    });
     const jobs = await context.scheduler.listJobs();
 
     if (!jobs.some((job) => job.name === 'expire-assessment-index')) {
@@ -104,9 +112,9 @@ const modeForm = Devvit.createForm({
   context.ui.showToast(values.live ? 'Live alerts enabled.' : 'Shadow mode enabled.');
 });
 
-addMenu('Rule Watch: delivery mode', 'subreddit', async (_event, context) => context.ui.showForm(modeForm));
+addAction('delivery mode', async (context) => context.ui.showForm(modeForm));
 
-addMenu('Rule Watch: test private message', 'subreddit', async (_event, context) => {
+addAction('test private message', async (context) => {
   await context.reddit.sendPrivateMessage({
     to: RECIPIENT, subject: 'Rule Watch delivery test',
     text: 'This is a manually requested delivery test. No Reddit content was sent to OpenAI. Confirm receipt before enabling live alerts.',
@@ -115,7 +123,33 @@ addMenu('Rule Watch: test private message', 'subreddit', async (_event, context)
   context.ui.showToast('Test submitted to Reddit. Confirm inbox receipt separately.');
 });
 
-addMenu('Rule Watch: request review report', 'subreddit', async (_event, context) => {
+const reportData = z.object({
+  title: z.enum(['Rule Watch review report', 'Rule Watch work-thread candidates']),
+  text: z.string().max(20_000),
+});
+
+const reportForm = Devvit.createForm((data) => {
+  const report = reportData.parse(data);
+
+  return {
+    title: report.title,
+    description: report.text,
+    fields: [],
+  };
+}, async (_event, context) => {
+  console.log('[DEBUG-rule-watch] report_form_submitted', { userPresent: Boolean(context.userId) });
+
+  try {
+    await requireModerator(context);
+    console.log('[DEBUG-rule-watch] report_form_authorized');
+  } catch (error) {
+    diagnosticFailure('report_form_failed', failureMetadata.parse(error), failureReason.parse(error));
+    throw error;
+  }
+});
+
+addAction('request review report', async (context) => {
+  console.log('[DEBUG-rule-watch] report_callback_entered');
   const records = await recentAssessments(context);
   const flagged = records.filter((record) => record.flagged.length > 0);
   const clean = records.filter((record) => record.flagged.length === 0);
@@ -133,11 +167,11 @@ addMenu('Rule Watch: request review report', 'subreddit', async (_event, context
   const reviewed = flagged.filter((record) => record.feedback);
   const useful = reviewed.filter((record) => record.feedback === 'useful').length;
   const pattern = await getWorkPattern(context);
-  await context.reddit.sendPrivateMessage({
-    to: RECIPIENT, subject: 'Rule Watch review report',
+  context.ui.showForm(reportForm, {
+    title: 'Rule Watch review report',
     text: `Manually requested report; no content excerpts.\n\nMode: ${await context.redis.get(LIVE_KEY) === 'true' ? 'live' : 'shadow'}. Work rule: ${pattern ? 'enabled with confirmed pattern' : 'DISABLED pending pattern verification'}.\n\nLatest ${records.length} assessments (at most 200, retained 30 days). Reviewed flags: ${useful}/${reviewed.length} useful. This is not a statistical guarantee. Up to 20 recent flags plus 5 unflagged samples follow.\n\n${lines.join('\n\n') || 'No assessments yet.'}\n\nUse the moderator feedback menu and paste the assessment ID to record useful/not useful. Unflagged samples can be marked not useful if a violation was missed; they are excluded from the flag-usefulness count.`,
   });
-  context.ui.showToast('Review report submitted to Reddit.');
+  console.log('[DEBUG-rule-watch] report_form_opened', { assessmentCount: records.length });
 });
 
 const feedbackForm = Devvit.createForm({
@@ -150,24 +184,40 @@ const feedbackForm = Devvit.createForm({
     },
   ],
 }, async ({ values }, context) => {
-  await requireModerator(context);
-  const id = values.assessmentId.trim();
+  console.log('[DEBUG-rule-watch] feedback_form_submitted', { userPresent: Boolean(context.userId) });
+  let stage = 'authorization';
 
-  if (!/^t[13]_[a-z0-9]+:[a-f0-9]{16}:\d+-[a-f0-9]{16}$/.test(id)) throw new Error('Invalid assessment ID.');
-  const record = await getAssessment(id, context);
+  try {
+    await requireModerator(context);
+    console.log('[DEBUG-rule-watch] feedback_form_authorized');
+    stage = 'assessment_id';
+    const id = values.assessmentId.trim();
 
-  if (!record) throw new Error('Assessment not found or expired.');
-  const feedback = values.feedback[0];
+    if (!/^t[13]_[a-z0-9]+:[a-f0-9]{16}:\d+-[a-f0-9]{16}$/.test(id)) throw new Error('Invalid assessment ID.');
+    stage = 'assessment_lookup';
+    const record = await getAssessment(id, context);
+    console.log('[DEBUG-rule-watch] feedback_assessment_lookup', { found: Boolean(record) });
 
-  if (feedback !== 'useful' && feedback !== 'not_useful') throw new Error('Choose a feedback value.');
-  record.feedback = feedback;
-  await saveAssessment(record, context);
-  context.ui.showToast('Feedback saved.');
+    if (!record) throw new Error('Assessment not found or expired.');
+    stage = 'feedback_value';
+    const feedback = values.feedback[0];
+
+    if (feedback !== 'useful' && feedback !== 'not_useful') throw new Error('Choose a feedback value.');
+    record.feedback = feedback;
+    stage = 'save';
+    await saveAssessment(record, context);
+    console.log('[DEBUG-rule-watch] feedback_saved', { contentId: record.contentId, feedback });
+    stage = 'toast';
+    context.ui.showToast('Feedback saved.');
+  } catch (error) {
+    diagnosticFailure(`feedback_form_failed_${stage}`, failureMetadata.parse(error), failureReason.parse(error));
+    throw error;
+  }
 });
 
-addMenu('Rule Watch: record feedback', 'subreddit', async (_event, context) => context.ui.showForm(feedbackForm));
+addAction('record feedback', async (context) => context.ui.showForm(feedbackForm));
 
-addMenu('Rule Watch: inspect work-thread history', 'subreddit', async (_event, context) => {
+addAction('inspect work-thread history', async (context) => {
   const posts = await context.reddit.searchPosts({
     subredditName: await subredditName(context), query: 'title:work', sort: 'new', timeframe: 'all', limit: 20,
   }).all();
@@ -176,11 +226,11 @@ addMenu('Rule Watch: inspect work-thread history', 'subreddit', async (_event, c
     `- ${post.title.replace(/[\r\n]/g, ' ').slice(0, 200)}\n  Author: ${post.authorName}; created UTC: ${post.createdAt.toISOString()}; ID: ${post.id}\n  https://www.reddit.com/r/${post.subredditName}/comments/${post.id.slice(3)}/`,
   );
 
-  await context.reddit.sendPrivateMessage({
-    to: RECIPIENT, subject: 'Rule Watch work-thread candidates',
-    text: `These are search candidates, NOT automatically authorized threads. Verify actual scheduled posts before configuring a pattern. Title/author/date metadata is included in this private message.\n\n${lines.join('\n\n') || 'No candidates found; use known historical scheduled posts.'}`,
+  context.ui.showForm(reportForm, {
+    title: 'Rule Watch work-thread candidates',
+    text: `These are search candidates, NOT automatically authorized threads. Verify actual scheduled posts before configuring a pattern. This moderator-only report contains title/author/date metadata.\n\n${lines.join('\n\n') || 'No candidates found; use known historical scheduled posts.'}`,
   });
-  context.ui.showToast('Candidate metadata report submitted to Reddit.');
+  console.log('[DEBUG-rule-watch] work_report_form_opened', { candidateCount: posts.length });
 });
 
 const workForm = Devvit.createForm({
@@ -234,11 +284,64 @@ const workForm = Devvit.createForm({
   context.ui.showToast('Pattern confirmed; work-rule assessment enabled for future content.');
 });
 
-addMenu('Rule Watch: confirm work-thread pattern', 'subreddit', async (_event, context) => context.ui.showForm(workForm));
+addAction('confirm work-thread pattern', async (context) => context.ui.showForm(workForm));
 
-addMenu('Rule Watch: disable work-rule assessment', 'subreddit', async (_event, context) => {
+addAction('disable work-rule assessment', async (context) => {
   await context.redis.del(WORK_PATTERN_KEY);
   context.ui.showToast('Work-rule assessment disabled.');
+});
+
+const toolsForm = Devvit.createForm({
+  title: 'Rule Watch tools',
+  fields: [{
+    type: 'select', name: 'action', label: 'Action', required: true,
+    options: actions.map(({ label }) => ({ label, value: label })),
+  }],
+}, async ({ values }, context) => {
+  console.log('[DEBUG-rule-watch] tools_form_submitted');
+  let authorized = false;
+
+  try {
+    await requireModerator(context);
+    authorized = true;
+    const action = actions.find(({ label }) => label === values.action[0]);
+
+    if (!action) throw new Error('Choose a valid action.');
+    console.log('[DEBUG-rule-watch] tools_action_started', { action: action.label });
+    await action.handler(context);
+    console.log('[DEBUG-rule-watch] tools_action_completed', { action: action.label });
+  } catch (error) {
+    diagnosticFailure('tools_action_failed', failureMetadata.parse(error), failureReason.parse(error));
+
+    if (authorized) context.ui.showForm(failureForm, { message: failureDisplay.parse(error) });
+    else context.ui.showToast('Moderator access required.');
+  }
+});
+
+Devvit.addMenuItem({
+  label: 'Rule Watch: tools', location: 'subreddit', forUserType: 'moderator',
+  onPress: async (_event, context) => {
+    console.log('[DEBUG-rule-watch] tools_menu_pressed');
+
+    try {
+      await requireModerator(context);
+      context.ui.showForm(toolsForm);
+      console.log('[DEBUG-rule-watch] tools_form_opened');
+
+      try {
+        console.log('[DEBUG-rule-watch] installation_state', {
+          approved: await context.settings.get<boolean>('processing-approved') === true,
+          keyPresent: Boolean(await context.settings.get<string>('openai-api-key')),
+          mode: await context.redis.get(LIVE_KEY) === 'true' ? 'live' : 'shadow',
+        });
+      } catch (error) {
+        diagnosticFailure('installation_state_failed', failureMetadata.parse(error), failureReason.parse(error));
+      }
+    } catch (error) {
+      diagnosticFailure('tools_menu_failed', failureMetadata.parse(error));
+      context.ui.showToast(error instanceof Error ? error.message : 'Action failed');
+    }
+  },
 });
 
 export default Devvit;

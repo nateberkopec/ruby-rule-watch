@@ -1,15 +1,33 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "ruby-rule-watch",
+  "name": "ruby-moderation-noti",
   "blocks": {
-    "entry": "src/main.ts"
+    "entry": "src/main.ts",
+    "triggers": [
+      "onPostSubmit",
+      "onPostCreate",
+      "onPostUpdate",
+      "onCommentSubmit",
+      "onCommentCreate",
+      "onCommentUpdate",
+      "onAppInstall",
+      "onAppUpgrade"
+    ]
+  },
+  "scheduler": {
+    "tasks": {}
   },
   "permissions": {
     "reddit": true,
     "redis": true,
     "http": {
       "enable": true,
-      "domains": ["api.openai.com"]
+      "domains": [
+        "api.openai.com"
+      ]
     }
+  },
+  "dev": {
+    "subreddit": "ruby_moderation_n_dev"
   }
 }

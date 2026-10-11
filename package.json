@@ -1,13 +1,12 @@
 {
-  "name": "ruby-rule-watch",
-  "version": "0.0.1",
+  "name": "ruby-moderation-noti",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
     "test:system": "node tests/system.mjs",
-    "lint": "oxlint --deny-warnings .",
-    "devvit": "devvit-cli"
+    "lint": "oxlint --deny-warnings ."
   },
   "dependencies": {
     "@devvit/public-api": "0.14.7",
@@ -15,9 +14,9 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@devvit/cli": "0.14.7",
     "@oxlint/plugins": "1.87.0",
     "oxlint": "1.87.0",
     "typescript": "~5.8.3"
-  }
+  },
+  "license": "BSD-3-Clause"
 }
