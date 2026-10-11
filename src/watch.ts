@@ -2,14 +2,12 @@ import type { TriggerContext } from '@devvit/public-api';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { assess, type Evidence } from './decisions.js';
-import { diagnosticFailure, failureMetadata } from './diagnostics.js';
+import { diagnosticFailure, failureMetadata, failureReason } from './diagnostics.js';
 import { RULE_VERSION, ruleLabel, rules, type RuleName } from './rules.js';
+import { reportingRules } from './stats.js';
 import { RETENTION_MS, saveAssessment, type Assessment } from './storage.js';
-import { getWorkPattern, isWorkThread } from './work-threads.js';
-
-export const RECIPIENT = 'nateberkopec';
-
-export const LIVE_KEY = 'live-alerts';
+import { subredditName } from './subreddit.js';
+import { isWorkThread } from './work-threads.js';
 
 export function digest(value: string): string {
   return bytesToHex(sha256(new TextEncoder().encode(value)));
@@ -19,17 +17,9 @@ export function normalize(value: string): string {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-export async function subredditName(context: Pick<TriggerContext, 'subredditName' | 'subredditId' | 'reddit'>): Promise<string> {
-  const name = context.subredditName ?? (await context.reddit.getSubredditInfoById(context.subredditId)).name;
-
-  if (!name) throw new Error('Subreddit name unavailable');
-
-  return name;
-}
-
 export async function watch(kind: 'post' | 'comment', id: string, context: TriggerContext): Promise<void> {
   const approved = await context.settings.get<boolean>('processing-approved');
-  console.log('[DEBUG-rule-watch] processing_gate', { kind, id, approved: approved === true });
+  console.log('[rule-watch] processing_gate', { kind, id, approved: approved === true });
 
   if (!approved) return;
   const lockKey = `processing:${id}`;
@@ -39,7 +29,7 @@ export async function watch(kind: 'post' | 'comment', id: string, context: Trigg
   });
 
   if (locked !== 'OK') {
-    console.log('[DEBUG-rule-watch] processing_lock_held', { id });
+    console.log('[rule-watch] processing_lock_held', { id });
 
     return;
   }
@@ -47,12 +37,23 @@ export async function watch(kind: 'post' | 'comment', id: string, context: Trigg
   try {
     await evaluate(kind, id, context);
   } catch (error) {
-    diagnosticFailure('evaluation_failed', failureMetadata.parse(error));
-    console.error(`Rule Watch failed for ${id}`);
+    diagnosticFailure('evaluation_failed', failureMetadata.parse(error), failureReason.parse(error));
     throw new Error(`Rule Watch failed for ${id}`);
   } finally {
     await context.redis.del(lockKey);
   }
+}
+
+async function overDailyCap(now: number, context: TriggerContext): Promise<boolean> {
+  const key = `report-count:${new Date(now).toISOString().slice(0, 10)}`;
+  const count = await context.redis.incrBy(key, 1);
+  await context.redis.expire(key, 2 * 24 * 60 * 60);
+
+  return count > (await context.settings.get<number>('daily-report-cap') ?? 20);
+}
+
+function isGone(item: { removed: boolean; spam: boolean; body?: string | undefined }): boolean {
+  return item.removed || item.spam || ['[deleted]', '[removed]'].includes(item.body ?? '');
 }
 
 async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerContext): Promise<void> {
@@ -62,9 +63,8 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
 
   if (item.subredditId !== context.subredditId) throw new Error('Wrong subreddit');
 
-  if (item.removed || item.spam || ['[deleted]', '[removed]'].includes(item.body ?? '') ||
-      ['automoderator', context.appSlug.toLowerCase(), '[deleted]'].includes(item.authorName.toLowerCase())) {
-    console.log('[DEBUG-rule-watch] excluded_content', { id });
+  if (isGone(item) || ['automoderator', context.appSlug.toLowerCase(), '[deleted]'].includes(item.authorName.toLowerCase())) {
+    console.log('[rule-watch] excluded_content', { id });
 
     return;
   }
@@ -74,12 +74,12 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
   const body = item.body ?? '';
 
   if (!normalize(`${kind === 'post' ? post.title : ''} ${body}`)) {
-    console.log('[DEBUG-rule-watch] empty_content', { id });
+    console.log('[rule-watch] empty_content', { id });
 
     return;
   }
 
-  const pattern = await getWorkPattern(context);
+  const workTitle = (await context.settings.get<string>('work-thread-title'))?.trim() ?? '';
   const thresholds: Partial<Record<RuleName, number>> = {};
 
   for (const rule of rules) {
@@ -89,26 +89,25 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
     thresholds[rule.name] = value;
   }
 
-  const configuration = `${RULE_VERSION}-${digest(JSON.stringify({ thresholds, pattern })).slice(0, 16)}`;
+  const configuration = `${RULE_VERSION}-${digest(JSON.stringify({ thresholds, workTitle })).slice(0, 16)}`;
   const contentDigest = digest(JSON.stringify({ title: kind === 'post' ? normalize(post.title) : '', body: normalize(body) }));
   const seenKey = `seen:${id}`;
   const revision = `${contentDigest}:${configuration}`;
 
   if (await context.redis.get(seenKey) === revision) {
-    console.log('[DEBUG-rule-watch] revision_unchanged', { id });
+    console.log('[rule-watch] revision_unchanged', { id });
 
     return;
   }
 
   const key = await context.settings.get<string>('openai-api-key');
-  console.log('[DEBUG-rule-watch] key_available', { id, present: Boolean(key) });
 
   if (!key) throw new Error('OpenAI key is not configured');
 
   const evidence: Evidence = {
     target: { kind, body: body.slice(0, 12_000) },
     context: { parents: [], truncated: body.length > 12_000 || post.title.length > 500 },
-    verifiedWorkThread: pattern ? isWorkThread(post, pattern) : false,
+    verifiedWorkThread: workTitle ? await isWorkThread(post, workTitle, context) : false,
   };
 
   if (kind === 'post') evidence.target.title = post.title.slice(0, 500);
@@ -123,7 +122,7 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
       try {
         const parent = await context.reddit.getCommentById(parentId);
 
-        if (!parent.removed && !parent.spam && !['[deleted]', '[removed]'].includes(parent.body)) {
+        if (!isGone(parent)) {
           evidence.context.parents.unshift({ body: parent.body.slice(0, 3_000), author: parent.authorName });
           evidence.context.truncated ||= parent.body.length > 3_000;
         }
@@ -138,7 +137,7 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
     evidence.context.truncated ||= parentId.startsWith('t1_');
   }
 
-  const scores = await assess(key, evidence, pattern !== undefined);
+  const scores = await assess(key, evidence, workTitle !== '');
   const flagged = rules.filter((rule) => (scores[rule.name] ?? -1) >= thresholds[rule.name]!).map((rule) => rule.name);
   const assessedAt = Date.now();
 
@@ -149,7 +148,6 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
     permalink: `https://www.reddit.com/r/${await subredditName(context)}/comments/${post.id.slice(3)}/${kind === 'comment' ? `_/${item.id.slice(3)}/` : ''}`,
     assessedAt,
     configuration,
-    mode: await context.redis.get(LIVE_KEY) === 'true' ? 'live' : 'shadow',
     scores,
     flagged,
     delivery: 'none',
@@ -157,9 +155,11 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
 
   await saveAssessment(record, context);
   await context.redis.set(seenKey, revision, { expiration: new Date(assessedAt + RETENTION_MS) });
-  console.log('[DEBUG-rule-watch] assessment_saved', { id, mode: record.mode, flaggedCount: flagged.length });
+  console.log('[rule-watch] assessment_saved', { id, flaggedCount: flagged.length });
+  const reporting = await reportingRules(context);
+  const reportable = flagged.filter((name) => reporting.includes(name));
 
-  if (record.mode !== 'live' || !flagged.length) return;
+  if (!reportable.length) return;
   const current = kind === 'post' ? await context.reddit.getPostById(id) : await context.reddit.getCommentById(id);
 
   const currentDigest = digest(JSON.stringify({
@@ -167,41 +167,19 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
     body: normalize(current.body ?? ''),
   }));
 
-  if (currentDigest !== contentDigest || current.removed || current.spam ||
-      ['[deleted]', '[removed]'].includes(current.body ?? '')) {
-    record.delivery = 'suppressed';
-    await saveAssessment(record, context);
-
-    return;
-  }
-
-  const notifiedKey = `notified:${id}`;
-
-  const claimed = await context.redis.set(notifiedKey, 'attempted', {
-    nx: true, expiration: new Date(assessedAt + RETENTION_MS),
-  });
-
-  if (claimed !== 'OK') {
-    record.delivery = 'suppressed';
-    await saveAssessment(record, context);
-
-    return;
-  }
-
-  record.delivery = 'attempted';
-  await saveAssessment(record, context);
+  const claimed = currentDigest === contentDigest && !isGone(current) &&
+    await context.redis.set(`reported:${id}`, '1', { nx: true, expiration: new Date(assessedAt + RETENTION_MS) }) === 'OK';
 
   try {
-    await context.reddit.sendPrivateMessage({
-      to: RECIPIENT,
-      subject: `Rule Watch: possible ${flagged.map(ruleLabel).join(', ')}`.slice(0, 100),
-      text: `Possible rule violation; please review, not an automatic moderation decision.\n\nRules: ${flagged.map(ruleLabel).join(', ')}\n\n${record.permalink}\n\nOriginal content excerpt:\n\n${(kind === 'post' ? `${post.title}\n${body}` : body).slice(0, 800).split('\n').map((line) => `> ${line.replace(/[[\]()*_<>\\]/g, '\\$&')}`).join('\n')}\n\nAssessment: \`${record.id}\``,
-    });
-    record.delivery = 'sent';
-  } catch {
-    record.delivery = 'failed';
-    throw new Error('Reddit alert delivery failed');
+    if (!claimed) record.delivery = 'suppressed';
+    else if (await overDailyCap(assessedAt, context)) record.delivery = 'capped';
+    else {
+      record.delivery = 'failed';
+      await context.reddit.report(current, { reason: `Rule Watch: ${reportable.map(ruleLabel).join(', ')}`.slice(0, 100) });
+      record.delivery = 'reported';
+    }
   } finally {
     await saveAssessment(record, context);
+    console.log('[rule-watch] report_delivery', { id, delivery: record.delivery });
   }
 }

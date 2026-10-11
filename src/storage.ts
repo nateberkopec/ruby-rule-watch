@@ -15,11 +15,10 @@ const assessment = z.object({
   permalink: z.url(),
   assessedAt: z.number(),
   configuration: z.string(),
-  mode: z.enum(['shadow', 'live']),
   scores: z.partialRecord(ruleName, z.number().min(0).max(1)),
   flagged: z.array(ruleName),
-  delivery: z.enum(['none', 'attempted', 'sent', 'failed', 'suppressed']),
-  feedback: z.enum(['useful', 'not_useful']).optional(),
+  delivery: z.enum(['none', 'suppressed', 'capped', 'reported', 'failed']),
+  outcome: z.enum(['removed', 'approved']).optional(),
 });
 
 export type Assessment = z.infer<typeof assessment>;
@@ -27,26 +26,34 @@ export type Assessment = z.infer<typeof assessment>;
 type StorageContext = Pick<TriggerContext, 'redis'>;
 
 export async function saveAssessment(record: Assessment, context: StorageContext): Promise<void> {
-  await context.redis.set(`assessment:${record.id}`, JSON.stringify(record), {
-    expiration: new Date(record.assessedAt + RETENTION_MS),
-  });
+  const expiration = new Date(record.assessedAt + RETENTION_MS);
+  await context.redis.set(`assessment:${record.id}`, JSON.stringify(record), { expiration });
+  await context.redis.set(`latest:${record.contentId}`, record.id, { expiration });
   await context.redis.zAdd(INDEX, { member: record.id, score: record.assessedAt });
 }
 
-export async function getAssessment(id: string, context: StorageContext): Promise<Assessment | undefined> {
-  const raw = await context.redis.get(`assessment:${id}`);
+export async function recordOutcome(contentId: string, outcome: 'removed' | 'approved', context: StorageContext): Promise<boolean> {
+  const id = await context.redis.get(`latest:${contentId}`);
+  const raw = id ? await context.redis.get(`assessment:${id}`) : undefined;
 
-  return raw ? assessment.parse(JSON.parse(raw)) : undefined;
+  if (!raw) return false;
+  const record = assessment.parse(JSON.parse(raw));
+  record.outcome = outcome;
+  await saveAssessment(record, context);
+
+  return true;
 }
 
 export async function cleanup(context: StorageContext): Promise<void> {
   await context.redis.zRemRangeByScore(INDEX, 0, Date.now() - RETENTION_MS);
 }
 
-export async function recentAssessments(context: StorageContext): Promise<Assessment[]> {
+export async function retainedAssessments(context: StorageContext): Promise<Assessment[]> {
   await cleanup(context);
-  const entries = await context.redis.zRange(INDEX, 0, 199, { by: 'rank', reverse: true });
-  const records = await Promise.all(entries.map((entry) => getAssessment(entry.member, context)));
+  const entries = await context.redis.zRange(INDEX, 0, -1, { by: 'rank' });
 
-  return records.filter((record): record is Assessment => record !== undefined);
+  if (!entries.length) return [];
+  const values = await context.redis.mGet(entries.map((entry) => `assessment:${entry.member}`));
+
+  return values.flatMap((value) => value ? [assessment.parse(JSON.parse(value))] : []);
 }

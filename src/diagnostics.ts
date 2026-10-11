@@ -13,8 +13,6 @@ export const failureMetadata = z.object({
 }).catch({});
 
 const reasons = [
-  { name: 'private_messages_disabled', pattern: /private messages?.{0,100}(archived|disabled|deprecated|unsupported)|PRIVATE_MESSAGES_DISABLED/i },
-  { name: 'recipient_restricted', pattern: /can't send a message to that user|cannot send.{0,60}(user|recipient)|USER_BLOCKED|NO_USER/i },
   { name: 'rate_limited', pattern: /RATELIMIT|rate.limit|too many requests/i },
   { name: 'authentication', pattern: /UNAUTHENTICATED|USER_REQUIRED|not authenticated|unauthorized/i },
   { name: 'permission', pattern: /PERMISSION_DENIED|forbidden|insufficient.scope|not permitted|not allowed/i },
@@ -38,5 +36,5 @@ type FailureMetadata = z.infer<typeof failureMetadata>;
 type FailureReason = z.infer<typeof failureReason>;
 
 export function diagnosticFailure(stage: string, metadata: FailureMetadata, reason: FailureReason = 'unclassified'): void {
-  console.error(`[DEBUG-rule-watch] ${stage}`, { ...metadata, reason });
+  console.error(`[rule-watch] ${stage}`, { ...metadata, reason });
 }

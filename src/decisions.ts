@@ -25,7 +25,6 @@ export async function assess(
   workRuleEnabled: boolean,
 ): Promise<Partial<Record<RuleName, number>>> {
   const activeRules = rules.filter((rule) => workRuleEnabled || rule.name !== 'work_posts');
-  console.log('[DEBUG-rule-watch] decisions_request_started', { ruleCount: activeRules.length });
 
   const response = await fetch('https://api.openai.com/v1/decisions', {
     method: 'POST',
@@ -44,13 +43,13 @@ export async function assess(
     throw error;
   });
 
-  console.log('[DEBUG-rule-watch] decisions_response', { status: response.status });
+  console.log('[rule-watch] decisions_response', { status: response.status });
 
   if (!response.ok) throw new Error(`Decisions HTTP ${response.status}`);
   const parsed = decisionResponse.safeParse(await response.json());
 
   if (!parsed.success) {
-    console.error('[DEBUG-rule-watch] decisions_response_invalid');
+    console.error('[rule-watch] decisions_response_invalid');
     throw new Error('Invalid Decisions response');
   }
 
@@ -69,8 +68,6 @@ export async function assess(
 
     scores[rule.name] = answer.probability;
   }
-
-  console.log('[DEBUG-rule-watch] decisions_assessment_completed');
 
   return scores;
 }

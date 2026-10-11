@@ -1,40 +1,32 @@
 import type { TriggerContext } from '@devvit/public-api';
-import { z } from 'zod';
+import { isModerator, subredditName } from './subreddit.js';
 
-export const WORK_PATTERN_KEY = 'work-pattern';
+export const DEFAULT_WORK_TITLE = 'Work it Wednesday: Who is hiring? Who is looking?';
 
-const workPattern = z.object({
-  titlePrefix: z.string().trim().min(1),
-  titleSuffix: z.string(),
-  author: z.string().regex(/^[\w-]{1,64}$/),
-  anchorUtc: z.iso.datetime({ precision: 0 }),
-  toleranceMinutes: z.number().min(0).max(60),
-});
+type WorkContext = Pick<TriggerContext, 'subredditName' | 'subredditId' | 'reddit'>;
 
-export type WorkPattern = z.infer<typeof workPattern>;
+export async function isWorkThread(
+  post: { title: string; authorName: string },
+  title: string,
+  context: WorkContext,
+): Promise<boolean> {
+  if (post.title.trim().toLowerCase() !== title.trim().toLowerCase()) return false;
 
-export async function getWorkPattern(context: Pick<TriggerContext, 'redis'>): Promise<WorkPattern | undefined> {
-  const raw = await context.redis.get(WORK_PATTERN_KEY);
-
-  return raw ? workPattern.parse(JSON.parse(raw)) : undefined;
+  return post.authorName.toLowerCase() === 'automoderator' || isModerator(post.authorName, context);
 }
 
-export function validateWorkPattern(pattern: WorkPattern): void {
-  workPattern.parse(pattern);
-}
+export async function validateWorkTitle(title: string | undefined, context: WorkContext): Promise<string | undefined> {
+  if (!title?.trim()) return;
 
-export function isWorkThread(
-  post: { title: string; authorName: string; createdAt: Date },
-  pattern: WorkPattern,
-): boolean {
-  const title = post.title.toLowerCase();
+  const posts = await context.reddit.searchPosts({
+    subredditName: await subredditName(context), query: `title:"${title.trim()}"`, sort: 'new', timeframe: 'all', limit: 25,
+  }).all();
 
-  if (!title.startsWith(pattern.titlePrefix.toLowerCase()) ||
-      !title.endsWith(pattern.titleSuffix.toLowerCase()) ||
-      post.authorName.toLowerCase() !== pattern.author.toLowerCase()) return false;
-  const fortnight = 14 * 24 * 60 * 60 * 1000;
-  const delta = post.createdAt.getTime() - Date.parse(pattern.anchorUtc);
-  const distance = Math.abs(delta - Math.round(delta / fortnight) * fortnight);
+  let matches = 0;
 
-  return distance <= pattern.toleranceMinutes * 60 * 1000;
+  for (const post of posts) if (await isWorkThread(post, title, context)) matches++;
+
+  if (matches < 3) {
+    return `Found ${matches} past posts by AutoModerator or a moderator with exactly this title; at least 3 are required.`;
+  }
 }
