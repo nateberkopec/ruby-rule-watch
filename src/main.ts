@@ -84,11 +84,13 @@ Devvit.addTrigger({
 });
 
 async function sendStats(context: TriggerContext): Promise<void> {
-  await context.reddit.modMail.createModNotification({
+  const conversationId = await context.reddit.modMail.createModNotification({
     subject: 'Rule Watch stats',
     bodyMarkdown: statsMarkdown(await statsRows(context)),
     subredditId: z.templateLiteral(['t5_', z.string()]).parse(context.subredditId),
   });
+
+  console.log('[rule-watch] stats_sent', { conversationId });
 }
 
 Devvit.addSchedulerJob({ name: 'expire-assessment-index', onRun: async (_event, context) => cleanup(context) });
@@ -124,18 +126,9 @@ const statsForm = Devvit.createForm((data) => ({
   fields: statsData.parse(data).rows.map((row, index) => ({
     type: 'string' as const, name: `row${index}`, label: row.label, defaultValue: row.value, disabled: true,
   })),
-  acceptLabel: 'Send to mod inbox',
+  acceptLabel: 'Done',
   cancelLabel: 'Close',
-}), async (_event, context) => {
-  try {
-    await requireModerator(context);
-    await sendStats(context);
-    context.ui.showToast('Stats sent to the mod inbox.');
-  } catch (error) {
-    diagnosticFailure('stats_send_failed', failureMetadata.parse(error), failureReason.parse(error));
-    context.ui.showToast(failureDisplay.parse(error));
-  }
-});
+}), async () => {});
 
 Devvit.addMenuItem({
   label: 'Rule Watch: stats', location: 'subreddit', forUserType: 'moderator',
@@ -145,6 +138,20 @@ Devvit.addMenuItem({
       context.ui.showForm(statsForm, { rows: await statsRows(context) });
     } catch (error) {
       diagnosticFailure('stats_failed', failureMetadata.parse(error), failureReason.parse(error));
+      context.ui.showToast(failureDisplay.parse(error));
+    }
+  },
+});
+
+Devvit.addMenuItem({
+  label: 'Rule Watch: send stats to mod inbox', location: 'subreddit', forUserType: 'moderator',
+  onPress: async (_event, context) => {
+    try {
+      await requireModerator(context);
+      await sendStats(context);
+      context.ui.showToast('Stats sent to the mod inbox.');
+    } catch (error) {
+      diagnosticFailure('stats_send_failed', failureMetadata.parse(error), failureReason.parse(error));
       context.ui.showToast(failureDisplay.parse(error));
     }
   },
