@@ -1,3 +1,8 @@
+---
+layout: default
+title: Privacy policy
+permalink: /privacy/
+---
 # Ruby Rule Watch privacy policy
 
 ## Purpose and access

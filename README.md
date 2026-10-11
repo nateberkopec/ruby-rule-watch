@@ -6,12 +6,12 @@ A moderator-only Devvit automation app for /r/ruby. It uses OpenAI's Decisions A
 
 ## Development
 
-Tool versions are managed by `mise.toml` (Node.js 26.10.0, Devvit CLI 0.14.7, hk and Pkl). Dependencies are pinned; this checkout uses Nate's npm-compatible aube and includes `aube-lock.yaml`. The system-test harness requires Node.js 22.15+.
+Tool versions are managed by `mise.toml` (Node.js 26.10.0, Devvit CLI 0.14.7, aube, gitleaks, hk and Pkl). Dependencies are pinned in `aube-lock.yaml` and installed with [aube](https://aube.sh). The system-test harness requires Node.js 22.15+.
 
 ```fish
 mise trust
 mise install
-npm install
+aube install --frozen-lockfile
 mise exec -- hk install
 mise run lint
 mise run test
@@ -21,7 +21,7 @@ devvit-cli --help
 
 `lint` runs TypeScript, Dillon Mulroy's AntiSlop rules and a redacted gitleaks working-tree scan. All 18 generic AntiSlop rules are enabled; source/tests/local configuration are linted, while upstream vendored code is excluded as upstream recommends. Provenance and licenses are in `tools/oxlint/anti-slop/`. Oxlint and `@oxlint/plugins` are pinned together. No rules are disabled to accommodate application findings; external API and stored JSON are validated with Zod.
 
-hk runs the standard lint and test tasks on pre-commit and `hk check`, using your managed user hooks. Mise loads `.env`; no local environment variables are required, so `.env.example` is intentionally empty. The OpenAI key stays in Devvit's encrypted app settings, never `.env`. `build` writes an ignored local actor bundle to `dist/` without uploading or installing it. There is no local server/serve task: Devvit playtesting would install the app and must be separately authorized.
+hk runs the standard lint and test tasks on pre-commit and `hk check`, using your managed user hooks. GitHub Actions runs lint, test and build on every push and pull request. Mise loads `.env`; no local environment variables are required, so `.env.example` is intentionally empty. The OpenAI key stays in Devvit's encrypted app settings, never `.env`. `build` writes an ignored local actor bundle to `dist/` without uploading or installing it. There is no local server/serve task: Devvit playtesting would install the app and must be separately authorized.
 
 The system test exercises the registered events, menus, forms and scheduler jobs with simulated Reddit, Redis, and OpenAI services. It makes no network requests, uses no real credentials, and does not establish model accuracy or actual Devvit behavior. Its failure logs exercise intentional refusal, report-failure and authorization scenarios.
 
@@ -35,10 +35,10 @@ The system test exercises the registered events, menus, forms and scheduler jobs
 
 1. Obtain mod-team approval for OpenAI processing and disclose this practice to the community.
 2. This project is registered as `ruby-moderation-noti`. Keep `devvit.json` aligned with that name. The app skips content authored by its runtime app slug.
-3. Keep the hosted policies in [ruby-rule-watch-policies](https://github.com/nateberkopec/ruby-rule-watch-policies) synchronized with `PRIVACY.md` and `TERMS.md`. They are the app's developer-details URLs:
-   - Privacy: `https://nateberkopec.github.io/ruby-rule-watch-policies/privacy/`
-   - Terms: `https://nateberkopec.github.io/ruby-rule-watch-policies/terms/`
-   The policies describe this implementation; they are not legal advice.
+3. The privacy policy and terms live in `docs/` and are published by GitHub Pages (main branch, `/docs`). They are the app's developer-details URLs:
+   - Privacy: `https://nateberkopec.github.io/ruby-rule-watch/privacy/`
+   - Terms: `https://nateberkopec.github.io/ruby-rule-watch/terms/`
+   Update them in the same change as any behavior they describe. They are not legal advice.
 4. Configure `openai-api-key` as an encrypted app secret with `devvit-cli settings set openai-api-key`. Never put the key in source or a Reddit form.
 
 Upload, publication and installation are intentionally not automated.
@@ -103,3 +103,7 @@ Not established: real-world precision and miss rates on /r/ruby, which need week
 - [Devvit HTTP Fetch](https://developers.reddit.com/docs/capabilities/server/http-fetch)
 - [OpenAI Decisions](https://developers.openai.com/api/docs/guides/decisions)
 - [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data)
+
+## License
+
+MIT. See `LICENSE`. Vendored AntiSlop code in `tools/oxlint/anti-slop/` keeps its upstream licenses.

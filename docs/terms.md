@@ -1,3 +1,8 @@
+---
+layout: default
+title: Terms
+permalink: /terms/
+---
 # Ruby Rule Watch terms
 
 Ruby Rule Watch is a moderation-assistance tool for authorized subreddit moderators. It reports possible rule violations to the subreddit's mod queue and summarizes how moderators acted on them. All moderation decisions remain with human moderators.
