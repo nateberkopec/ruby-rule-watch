@@ -6,7 +6,7 @@ Ruby Rule Watch is a moderation-assistance tool for authorized subreddit moderat
 
 Install and enable processing only with the mod team's approval and required Reddit platform permissions. Disclose external processing to the community. Use an authorized OpenAI API project and configure its secret through Devvit. The project owner is responsible for OpenAI charges and compliance with applicable Reddit and OpenAI terms.
 
-Settings, stats and stats notifications are available only to current moderators. Do not broaden access or redistribute community data in ways inconsistent with the privacy policy and platform terms.
+Settings and stats are available only to current moderators. Do not broaden access or redistribute community data in ways inconsistent with the privacy policy and platform terms.
 
 ## Limitations
 
@@ -18,6 +18,6 @@ Stats measure only flags moderators acted on. They are not a complete accuracy m
 
 ## Data and service availability
 
-Use is subject to the accompanying privacy policy and third-party platform policies. Reports and modmail notifications are retained by Reddit separately from the app's expiring metadata. External APIs, beta endpoint behavior, pricing, SDK compatibility and platform permissions may change. The app may be disabled or uninstalled by moderators.
+Use is subject to the accompanying privacy policy and third-party platform policies. Reports are retained by Reddit separately from the app's expiring metadata. External APIs, beta endpoint behavior, pricing, SDK compatibility and platform permissions may change. The app may be disabled or uninstalled by moderators.
 
 The app is provided as-is without warranties of accuracy, completeness, availability, or suitability. Contact the /r/ruby moderator team through Reddit modmail with questions about the installation.

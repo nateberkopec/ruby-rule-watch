@@ -4,7 +4,7 @@
 
 Ruby Rule Watch helps subreddit moderators find possible rule violations for human review. It reports likely violations to the subreddit's mod queue. It does not remove, approve or lock content, ban users, or reply publicly. Processing is disabled until the installing moderators explicitly approve it.
 
-Only current subreddit moderators can change the app's settings, view its stats, or send stats to the mod inbox.
+Only current subreddit moderators can change the app's settings or view its stats.
 
 ## Data processed
 
@@ -20,9 +20,9 @@ The app does not persist copies of source post/comment bodies. Digests are not g
 
 App error logs are intended to contain identifiers and error information, not source content. Logs are subject to Reddit's platform retention policies rather than the app's cleanup.
 
-## Reports and notifications
+## Reports
 
-Mod-queue reports are visible to the subreddit's moderators and contain only rule labels. The stats view, and the stats notification sent to the subreddit's modmail weekly or on request, contain only aggregate counts. Reports and modmail are retained by Reddit and are not deleted by the app's 30-day cleanup.
+Mod-queue reports are visible to the subreddit's moderators and contain only rule labels. The stats view is shown only to the requesting moderator and contains only aggregate counts. Reports are retained by Reddit and are not deleted by the app's 30-day cleanup.
 
 ## OpenAI retention
 

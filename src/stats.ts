@@ -44,11 +44,3 @@ export async function statsRows(context: Pick<TriggerContext, 'redis' | 'setting
 
   return rows;
 }
-
-export function statsMarkdown(rows: StatsRow[]): string {
-  return [
-    '| | |', '|---|---|',
-    ...rows.map((row) => `| ${row.label} | ${row.value} |`),
-    '', 'Precision = removed ÷ (removed + approved) among flags a moderator acted on. Flags nobody acted on are excluded.',
-  ].join('\n');
-}

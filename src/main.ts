@@ -1,8 +1,8 @@
-import { Devvit, type Context, type TriggerContext } from '@devvit/public-api';
+import { Devvit, type Context } from '@devvit/public-api';
 import { z } from 'zod';
 import { rules } from './rules.js';
 import { diagnosticFailure, failureDisplay, failureMetadata, failureReason } from './diagnostics.js';
-import { statsMarkdown, statsRows } from './stats.js';
+import { statsRows } from './stats.js';
 import { cleanup, recordOutcome } from './storage.js';
 import { isModerator } from './subreddit.js';
 import { watch } from './watch.js';
@@ -15,7 +15,7 @@ Devvit.addSettings([
   {
     type: 'boolean', name: 'processing-approved', label: 'Mod team approved sending content to OpenAI',
     defaultValue: false,
-    helpText: 'Off means no content processing, reports, or weekly stats.',
+    helpText: 'Off means no content processing or reports.',
   },
   {
     type: 'select', name: 'reporting-rules', label: 'Rules that report to the mod queue', multiSelect: true,
@@ -83,24 +83,7 @@ Devvit.addTrigger({
   },
 });
 
-async function sendStats(context: TriggerContext): Promise<void> {
-  const conversationId = await context.reddit.modMail.createModNotification({
-    subject: 'Rule Watch stats',
-    bodyMarkdown: statsMarkdown(await statsRows(context)),
-    subredditId: z.templateLiteral(['t5_', z.string()]).parse(context.subredditId),
-  });
-
-  console.log('[rule-watch] stats_sent', { conversationId });
-}
-
 Devvit.addSchedulerJob({ name: 'expire-assessment-index', onRun: async (_event, context) => cleanup(context) });
-
-Devvit.addSchedulerJob({
-  name: 'weekly-stats',
-  onRun: async (_event, context) => {
-    if (await context.settings.get<boolean>('processing-approved')) await sendStats(context);
-  },
-});
 
 Devvit.addTrigger({
   events: ['AppInstall', 'AppUpgrade'],
@@ -111,11 +94,14 @@ Devvit.addTrigger({
       keyPresent: Boolean(await context.settings.get<string>('openai-api-key')),
       reporting: await context.settings.get<string[]>('reporting-rules') ?? [],
     });
-    const scheduled = new Set((await context.scheduler.listJobs()).map((job) => job.name));
+    let scheduled = false;
 
-    for (const [name, cron] of [['expire-assessment-index', '0 0 * * *'], ['weekly-stats', '0 15 * * 1']] as const) {
-      if (!scheduled.has(name)) await context.scheduler.runJob({ name, cron });
+    for (const job of await context.scheduler.listJobs()) {
+      if (job.name === 'expire-assessment-index') scheduled = true;
+      else await context.scheduler.cancelJob(job.id);
     }
+
+    if (!scheduled) await context.scheduler.runJob({ name: 'expire-assessment-index', cron: '0 0 * * *' });
   },
 });
 
@@ -138,20 +124,6 @@ Devvit.addMenuItem({
       context.ui.showForm(statsForm, { rows: await statsRows(context) });
     } catch (error) {
       diagnosticFailure('stats_failed', failureMetadata.parse(error), failureReason.parse(error));
-      context.ui.showToast(failureDisplay.parse(error));
-    }
-  },
-});
-
-Devvit.addMenuItem({
-  label: 'Rule Watch: send stats to mod inbox', location: 'subreddit', forUserType: 'moderator',
-  onPress: async (_event, context) => {
-    try {
-      await requireModerator(context);
-      await sendStats(context);
-      context.ui.showToast('Stats sent to the mod inbox.');
-    } catch (error) {
-      diagnosticFailure('stats_send_failed', failureMetadata.parse(error), failureReason.parse(error));
       context.ui.showToast(failureDisplay.parse(error));
     }
   },

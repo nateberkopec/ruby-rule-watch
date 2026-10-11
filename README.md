@@ -45,7 +45,7 @@ Upload, publication and installation are intentionally not automated.
 
 ## Installation settings
 
-- **Mod team approved sending content to OpenAI:** off means no processing, reports or weekly stats.
+- **Mod team approved sending content to OpenAI:** off means no processing or reports.
 - **Rules that report to the mod queue:** selected rules file a mod-queue report. Unselected rules are still assessed and counted in stats. Start with one rule and add others once its precision holds up.
 - **Maximum mod-queue reports per UTC day:** default 20. Flags beyond the cap are recorded as `capped` and not reported.
 - **Work thread title:** default `Work it Wednesday: Who is hiring? Who is looking?`. A post is the work thread when its title matches exactly (case-insensitive) and its author is AutoModerator or a current moderator. Saving settings searches the subreddit and requires at least three such past posts; Reddit search can lag several minutes behind new posts. Empty disables the work rule. There is no schedule matching: /r/ruby's thread has run every two, four and six weeks at different times.
@@ -61,14 +61,9 @@ Flagged items appear in the mod queue with the report reason `Rule Watch: <rule 
 
 Actions by AutoModerator and the app itself are ignored. Only the latest assessment of each item, within the 30-day retention window, receives an outcome. Flags nobody acts on are excluded from precision.
 
-The subreddit menu has two moderator-only items:
+The moderator-only subreddit menu item **Rule Watch: stats** shows the last 30 days privately: items assessed, reported, capped and failed, then per rule the flagged, removed and approved counts with precision = removed ÷ (removed + approved), and a count of removals the app did not flag. Mod-queue reports are the app's only outgoing Reddit communication.
 
-- **Rule Watch: stats** shows the last 30 days privately: items assessed, reported, capped and failed, then per rule the flagged, removed and approved counts with precision = removed ÷ (removed + approved), and a count of removals the app did not flag.
-- **Rule Watch: send stats to mod inbox** posts the same table as a modmail notification.
-
-The same notification is sent every Monday at 15:00 UTC while processing is approved. It contains only aggregate counts.
-
-All menu callbacks independently verify current moderator membership on the server.
+The menu callback independently verify current moderator membership on the server.
 
 ## Evaluation
 
@@ -98,7 +93,7 @@ OpenAI retention is separate: default abuse-monitoring logs can be retained up t
 
 ## Verified on Reddit
 
-In /r/ruby_moderation_n_dev: the approval gate, edit reassessment, duplicate-event suppression, mod-queue reports with app attribution, outcomes from moderator remove/approve actions, the work rule inside and outside a moderator-authored work thread, work-title validation on save, the stats form and modmail delivery of the stats notification.
+In /r/ruby_moderation_n_dev: the approval gate, edit reassessment, duplicate-event suppression, mod-queue reports with app attribution, outcomes from moderator remove/approve actions, the work rule inside and outside a moderator-authored work thread, work-title validation on save, and the stats form.
 
 Not established: real-world precision and miss rates on /r/ruby, which need weeks of moderator actions.
 
