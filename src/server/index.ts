@@ -2,11 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { context, createServer, getServerPort, reddit, redis, scheduler } from '@devvit/web/server';
 import { z } from 'zod';
 import {
-  BACKTEST_RETENTION_MS, CORPUS_SIZE, SOURCE_SUBREDDIT, corpusComplete, corpusItems, globalKeys, keys, kickBacktest,
-  liveWording, readCorpus, readQueue, readRewrites, readScores, removedItem, removedItems, ruleName, saveQueue,
+  BACKTEST_RETENTION_MS, CORPUS_SIZE, SOURCE_SUBREDDIT, corpusComplete, corpusItems, keys, kickBacktest,
+  liveWording, readCorpus, readQueue, readRewrites, readScores, removedItems, ruleName, saveQueue,
   saveRewrites, wordingId, type RemovedItem,
 } from '../backtest-store.js';
-import { failureDisplay } from '../diagnostics.js';
+import { diagnosticFailure, failureDisplay, failureReason } from '../diagnostics.js';
 import { evaluationInstructions, rules } from '../rules.js';
 
 const judgment = z.object({ rule: ruleName, id: z.string(), verdict: z.enum(['yes', 'no']).nullable() });
@@ -153,13 +153,13 @@ async function removedText(record: RemovedItem) {
 }
 
 async function text({ ids }: z.infer<typeof textRequest>) {
-  const records = await redis.global.mGet(ids.map(globalKeys.record));
+  const records = (await removedItems(redis.global)).filter((record) => ids.includes(record.id));
 
-  return Promise.all(ids.map(async (id, index) => {
-    const raw = records[index];
+  return Promise.all(ids.map(async (id) => {
+    const record = records.find((entry) => entry.id === id);
 
     try {
-      return raw ? await removedText(removedItem.parse(JSON.parse(raw))) : await liveText(id);
+      return record ? await removedText(record) : await liveText(id);
     } catch {
       return { id, unavailable: true };
     }
@@ -188,7 +188,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 createServer((req, res) => {
   handle(req, res).catch((error) => {
     const status = error instanceof HttpError ? error.status : error instanceof z.ZodError ? 400 : 500;
-    console.error('[rule-watch] backtest_request_failed', { status });
+    diagnosticFailure('backtest_request_failed', { status }, failureReason.parse(error));
     send(res, status, { error: failureDisplay.parse(error) });
   });
 }).listen(getServerPort());

@@ -133,7 +133,10 @@ export async function readScores(id: string, store: Store): Promise<Record<strin
 }
 
 export async function removedItems(store: GlobalStore): Promise<RemovedItem[]> {
-  const entries = await store.zRange(globalKeys.removed, 0, -1, { by: 'rank' });
+  const entries = await store.zRange(globalKeys.removed, 0, -1, { by: 'rank' }).catch((error: Error) => {
+    if (error.message.includes('global redis is not supported')) return [];
+    throw error;
+  });
 
   if (!entries.length) return [];
   const values = await store.mGet(entries.map((entry) => globalKeys.record(entry.member)));
