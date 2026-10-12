@@ -7,10 +7,10 @@ const methods = bundle.dependencies.provides.flatMap(({ definition }) => definit
 
 for (const method of [
   'OnPostSubmit', 'OnPostCreate', 'OnPostUpdate',
-  'OnCommentSubmit', 'OnCommentCreate', 'OnCommentUpdate', 'OnModAction',
+  'OnCommentSubmit', 'OnCommentCreate', 'OnCommentUpdate', 'OnModAction', 'OnPostDelete', 'OnCommentDelete',
   'OnAppInstall', 'OnAppUpgrade', 'HandleScheduledAction',
 ]) {
   assert.ok(methods.includes(method), `Built actor does not advertise ${method}; check devvit.json registrations.`);
 }
 
-console.log('Actor bundle passed: all nine event handlers and the scheduler are advertised.');
+console.log('Actor bundle passed: all eleven event handlers and the scheduler are advertised.');

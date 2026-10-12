@@ -4,17 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.client.json",
     "test:system": "node tests/system.mjs",
-    "lint": "oxlint --deny-warnings ."
+    "lint": "oxlint --deny-warnings .",
+    "build:backtest": "esbuild src/server/index.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/server/index.cjs && esbuild src/client/backtest.ts src/client/launch.ts --bundle --minify --splitting --format=esm --target=es2022 --outdir=public"
   },
   "dependencies": {
     "@devvit/public-api": "0.14.7",
+    "@devvit/web": "0.14.7",
     "@noble/hashes": "2.4.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.87.0",
+    "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
     "oxlint": "1.87.0",
     "typescript": "~5.8.3"
   },

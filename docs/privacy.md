@@ -9,11 +9,13 @@ permalink: /privacy/
 
 Ruby Rule Watch helps subreddit moderators find possible rule violations for human review. It reports likely violations to the subreddit's mod queue. It does not remove, approve or lock content, ban users, or reply publicly. Processing is disabled until the installing moderators explicitly approve it.
 
-Only current subreddit moderators can change the app's settings or view its stats.
+Only current subreddit moderators can change the app's settings, view its stats or open its Backtest.
+
+The Backtest is a moderator-only page in a private test subreddit. It scores /r/ruby's newest 1,000 public posts and comments, and items /r/ruby moderators removed in the last 30 days, so moderators can check the rules' wording and thresholds before changing the live settings. It never reports, removes or posts anything on /r/ruby.
 
 ## Data processed
 
-The app reads post titles, post self-text, comment bodies, limited ancestor-comment context, usernames needed for thread context and exclusions, and content identifiers/permalinks. To recognize the subreddit's work thread it reads historical post titles and authors, and checks whether an author is a current moderator. It reads moderator approve, remove and spam actions on posts and comments: the target identifier, the action and the acting moderator's username, which is used only to ignore actions by AutoModerator and the app. It does not process private modmail, account histories, image/video contents or the contents of linked websites.
+The app reads post titles, post self-text, comment bodies, limited ancestor-comment context, usernames needed for thread context and exclusions, and content identifiers/permalinks. To recognize the subreddit's work thread it reads historical post titles and authors, and checks whether an author is a current moderator. It reads moderator approve, remove and spam actions on posts and comments: the target identifier, the action and the acting moderator's username, which is used only to ignore actions by AutoModerator and the app. For the Backtest, it reads /r/ruby's newest public posts and comments, the same context described above, moderators' removal reasons from the moderation log, and rule rewrites typed by moderators. It does not process private modmail, account histories, image/video contents or the contents of linked websites.
 
 Selected text and limited context are sent to OpenAI's Decisions API for classification. Classification instructions treat community text as evidence rather than instructions. No anonymity guarantee is made; Reddit text can contain personal information supplied by its authors.
 
@@ -21,7 +23,9 @@ Selected text and limited context are sent to OpenAI's Decisions API for classif
 
 Reddit-hosted Redis storage contains content identifiers, permalinks, content digests, assessment timestamps, rule/configuration versions, estimates, flags, report status, and whether a moderator later removed or approved the item. Moderator usernames are not stored. This metadata expires after 30 days; daily report counters expire after two days. Index entries are pruned daily.
 
-The app does not persist copies of source post/comment bodies. Digests are not guaranteed to be anonymous. Installation settings persist until changed or the app is uninstalled. The OpenAI API key is held in Devvit's encrypted app-secret settings, not Redis or source code.
+When a moderator removes or spams a post or comment, the app stores a copy of the text it would send to OpenAI: the item's title and body, and for comments the parent post and up to three earlier comments with their authors' usernames. It also stores the removal time and removal reason. On installation or upgrade it does the same for removals in the last 30 days of the moderation log. These copies are kept in storage shared by all of the app's installations, so the Backtest in the private test subreddit can read them. Each copy is deleted after 30 days, when a moderator approves the item, or as soon as the item or any post or comment included in the copy is deleted on Reddit. No other copies of post or comment text are stored. Digests are not guaranteed to be anonymous.
+
+The Backtest stores the IDs of the posts and comments it scored, their scores, rewritten rule wordings, and moderators' "worth a look" or "not worth it" judgments, without moderator usernames. Post and comment text is fetched from Reddit each time it is shown and is not stored. All Backtest data expires after 30 days. Installation settings persist until changed or the app is uninstalled. The OpenAI API key is held in Devvit's encrypted app-secret settings, not Redis or source code.
 
 App error logs are intended to contain identifiers and error information, not source content. Logs are subject to Reddit's platform retention policies rather than the app's cleanup.
 
@@ -37,4 +41,4 @@ See [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-da
 
 ## Questions and removal
 
-Contact the /r/ruby moderator team through Reddit modmail with questions about this installation. Deleting Reddit content does not recall reports already filed or data already sent to OpenAI. App metadata expires under the policy above. Moderators can disable processing or uninstall the app.
+Contact the /r/ruby moderator team through Reddit modmail with questions about this installation. Deleting Reddit content deletes the app's stored copies of its text, but does not recall reports already filed or data already sent to OpenAI. App metadata expires under the policy above. Moderators can disable processing or uninstall the app.

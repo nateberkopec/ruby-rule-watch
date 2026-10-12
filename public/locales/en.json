@@ -1,0 +1,105 @@
+{
+  "app": {
+    "title": "Backtest"
+  },
+  "launch": {
+    "open": "Open Backtest"
+  },
+  "intro": {
+    "body": "This page allows you to backtest Decision API behavior against /r/ruby's last 1000 posts and comments.",
+    "steps": [
+      "Pick a rule.",
+      "Look at each item the model flagged, mark your own decision re if it should be flagged or not",
+      "Adjust the threshold to see what % of flagged comments match your assessments",
+      "You can also try new wordings of rules and rerun the backtest"
+    ]
+  },
+  "run": {
+    "listing": "Getting r/ruby's newest posts. Scoring starts in a moment.",
+    "progress": "Scoring {done} of {total} with the live wording.",
+    "error": "Scoring stopped: {error}"
+  },
+  "rule": {
+    "label": "Rule"
+  },
+  "wording": {
+    "liveName": "Rule (live)",
+    "liveDescription": "what this utility uses on r/ruby today",
+    "rewriteName": "Rewrite {number}",
+    "rewriteDescription": "scored against the same {total} items",
+    "flagCount": "Flags {count} at {threshold}",
+    "showingResults": "The results below are for this wording.",
+    "showResults": "Show results for this wording",
+    "rewrite": "Rewrite this",
+    "shared": "General instructions: {instructions}"
+  },
+  "editor": {
+    "label": "Rewritten wording",
+    "score": "Score the same {total} items with this rewrite",
+    "cancel": "Cancel",
+    "progress": "{done} / {total}",
+    "waitForLive": "Rewrites unlock when the live wording finishes scoring."
+  },
+  "headline": {
+    "flagged": "{count} flagged",
+    "context": "out of {total} at threshold {threshold}"
+  },
+  "chart": {
+    "thresholdLabel": "Flag threshold",
+    "barTitle": {
+      "one": "{count} item at {score}",
+      "other": "{count} items at {score}"
+    },
+    "hiddenBelow": "{count} of {total} score below {floor} and aren't shown. Drag the line to change the threshold."
+  },
+  "meter": {
+    "target": "Target: 9 in 10",
+    "empty": "Add your judgements below.",
+    "progress": {
+      "one": "{yes} of {judged} human-judged flag was worth a look ({percent}%). {remaining} still to judge.",
+      "other": "{yes} of {judged} human-judged flags were worth a look ({percent}%). {remaining} still to judge."
+    }
+  },
+  "tabs": {
+    "judge": "To judge ({count})",
+    "judged": "Judged ({count})",
+    "changed": "Different from live wording ({count})",
+    "removals": "Catches mod removals? ({caught} of {count})"
+  },
+  "notes": {
+    "judge": "Highest scores first.",
+    "changed": "Compared with the live wording at {threshold}. Only newly flagged items need judging; your earlier judgments carry over.",
+    "removals": {
+      "one": "This is the {count} post or comment a moderator removed from r/ruby in the last 30 days. At {threshold}, this wording would have reported {caught} of them. \"Would have missed\" means a mod had to find it without Rule Watch's help.",
+      "other": "These are the {count} posts and comments a moderator removed from r/ruby in the last 30 days. At {threshold}, this wording would have reported {caught} of them. \"Would have missed\" means a mod had to find it without Rule Watch's help."
+    }
+  },
+  "empty": {
+    "judge": "Every flag at {threshold} is judged. Lower the threshold to see what else would be flagged.",
+    "judged": "Nothing judged yet. Open \"To judge\" and press Y or N on each flag.",
+    "changed": "This wording flags exactly the same items at {threshold}.",
+    "removals": "No mod removals collected yet."
+  },
+  "item": {
+    "post": "Post by {author}",
+    "comment": "Comment by {author}",
+    "replyingTo": "replying to:",
+    "flagged": "flagged",
+    "notFlagged": "not flagged",
+    "worth": "Worth a look",
+    "notWorth": "Not worth it",
+    "open": "Open on Reddit",
+    "loading": "Loading…",
+    "unavailable": "Deleted or no longer available on Reddit."
+  },
+  "tags": {
+    "newlyFlagged": "Newly flagged",
+    "noLongerFlagged": "No longer flagged",
+    "wouldHaveFlagged": "Would have flagged",
+    "wouldHaveMissed": "Would have missed",
+    "reason": "Removal reason: {reason}"
+  },
+  "keys": {
+    "hint": "Keys: Y worth a look, N not worth it, J and K to move."
+  }
+}

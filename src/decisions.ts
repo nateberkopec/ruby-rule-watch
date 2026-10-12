@@ -9,34 +9,38 @@ const decisionResponse = z.object({
   ])),
 });
 
-export type Evidence = {
-  target: { kind: 'post' | 'comment'; title?: string; body: string };
-  context: {
-    post?: { title: string; body: string };
-    parents: { body: string; author: string }[];
-    truncated: boolean;
-  };
-  verifiedWorkThread: boolean;
-};
+export const evidence = z.object({
+  target: z.object({ kind: z.enum(['post', 'comment']), title: z.string().optional(), body: z.string() }),
+  context: z.object({
+    post: z.object({ title: z.string(), body: z.string() }).optional(),
+    parents: z.array(z.object({ body: z.string(), author: z.string() })),
+    truncated: z.boolean(),
+  }),
+  verifiedWorkThread: z.boolean(),
+});
 
-export async function assess(
+export type Evidence = z.infer<typeof evidence>;
+
+export type Question<Name extends string> = { name: Name; instructions: string };
+
+export function liveQuestions(workRuleEnabled: boolean): Question<RuleName>[] {
+  return rules.filter((rule) => workRuleEnabled || rule.name !== 'work_posts')
+    .map((rule) => ({ name: rule.name, instructions: `${evaluationInstructions} ${rule.instructions}` }));
+}
+
+export async function assess<Name extends string>(
   apiKey: string,
-  evidence: Evidence,
-  workRuleEnabled: boolean,
-): Promise<Partial<Record<RuleName, number>>> {
-  const activeRules = rules.filter((rule) => workRuleEnabled || rule.name !== 'work_posts');
+  input: Evidence,
+  questions: Question<Name>[],
+): Promise<Partial<Record<Name, number>>> {
 
   const response = await fetch('https://api.openai.com/v1/decisions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gpt-6-luna',
-      input: JSON.stringify(evidence),
-      questions: activeRules.map((rule) => ({
-        type: 'predicate',
-        name: rule.name,
-        instructions: `${evaluationInstructions} ${rule.instructions}`,
-      })),
+      input: JSON.stringify(input),
+      questions: questions.map((question) => ({ type: 'predicate', ...question })),
     }),
   }).catch((error) => {
     diagnosticFailure('decisions_request_rejected', failureMetadata.parse(error));
@@ -55,18 +59,18 @@ export async function assess(
 
   const result = parsed.data;
 
-  const scores: Partial<Record<RuleName, number>> = {};
+  const scores: Partial<Record<Name, number>> = {};
 
-  for (const rule of activeRules) {
-    const matches = result.answers.filter((answer) => answer.name === rule.name);
+  for (const question of questions) {
+    const matches = result.answers.filter((answer) => answer.name === question.name);
     const answer = matches[0];
 
-    if (matches.length !== 1 || !answer) throw new Error(`Missing or duplicate answer: ${rule.name}`);
+    if (matches.length !== 1 || !answer) throw new Error(`Missing or duplicate answer: ${question.name}`);
 
-    if (answer.type === 'refusal') throw new Error(`Decisions refusal: ${rule.name}`);
+    if (answer.type === 'refusal') throw new Error(`Decisions refusal: ${question.name}`);
 
 
-    scores[rule.name] = answer.probability;
+    scores[question.name] = answer.probability;
   }
 
   return scores;

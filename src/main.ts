@@ -1,10 +1,13 @@
 import { Devvit, type Context } from '@devvit/public-api';
 import { z } from 'zod';
+import { backtestTick } from './backtest.js';
+import { BACKTEST_JOB, SOURCE_SUBREDDIT, keys } from './backtest-store.js';
+import { attachReason, continueBackfill, forgetRemoved, isHumanModerator, keepRemoved, startBackfill } from './removals.js';
 import { rules } from './rules.js';
 import { diagnosticFailure, failureDisplay, failureMetadata, failureReason } from './diagnostics.js';
 import { statsRows } from './stats.js';
 import { cleanup, recordOutcome } from './storage.js';
-import { isModerator } from './subreddit.js';
+import { isModerator, subredditName } from './subreddit.js';
 import { watch } from './watch.js';
 import { DEFAULT_WORK_TITLE, validateWorkTitle } from './work-threads.js';
 
@@ -74,16 +77,39 @@ Devvit.addTrigger({
   event: 'ModAction',
   onEvent: async (event, context) => {
     const outcome = outcomeOf(event.action);
-    const moderator = event.moderator?.name.toLowerCase() ?? '';
     const id = event.action?.endsWith('comment') ? event.targetComment?.id : event.targetPost?.id;
 
-    if (!outcome || !id || ['automoderator', context.appSlug.toLowerCase(), ''].includes(moderator)) return;
+    if (!id || !isHumanModerator(event.moderator?.name ?? '', context.appSlug)) return;
+
+    if (event.action === 'addremovalreason') return attachReason(event.targetComment?.id || id, context);
+
+    if (!outcome) return;
     const recorded = await recordOutcome(id, outcome, context);
     console.log('[rule-watch] mod_action', { id, outcome, recorded });
+
+    try {
+      if (outcome === 'approved') await forgetRemoved(id, context);
+      else await keepRemoved(id, Date.now(), undefined, context);
+    } catch (error) {
+      diagnosticFailure('removed_item_failed', failureMetadata.parse(error), failureReason.parse(error));
+    }
+  },
+});
+
+Devvit.addTrigger({
+  events: ['PostDelete', 'CommentDelete'],
+  onEvent: async (event, context) => {
+    const id = event.type === 'PostDelete' ? event.postId : event.commentId;
+    const prefix = event.type === 'PostDelete' ? 't3_' : 't1_';
+    await forgetRemoved(id.startsWith(prefix) ? id : `${prefix}${id}`, context);
   },
 });
 
 Devvit.addSchedulerJob({ name: 'expire-assessment-index', onRun: async (_event, context) => cleanup(context) });
+
+Devvit.addSchedulerJob({ name: 'backfill-removals', onRun: async (_event, context) => continueBackfill(context) });
+
+Devvit.addSchedulerJob({ name: BACKTEST_JOB, onRun: async (_event, context) => backtestTick(context) });
 
 Devvit.addTrigger({
   events: ['AppInstall', 'AppUpgrade'],
@@ -102,6 +128,7 @@ Devvit.addTrigger({
     }
 
     if (!scheduled) await context.scheduler.runJob({ name: 'expire-assessment-index', cron: '0 0 * * *' });
+    await startBackfill(context);
   },
 });
 
@@ -124,6 +151,28 @@ Devvit.addMenuItem({
       context.ui.showForm(statsForm, { rows: await statsRows(context) });
     } catch (error) {
       diagnosticFailure('stats_failed', failureMetadata.parse(error), failureReason.parse(error));
+      context.ui.showToast(failureDisplay.parse(error));
+    }
+  },
+});
+
+Devvit.addMenuItem({
+  label: 'Rule Watch: open Backtest', location: 'subreddit', forUserType: 'moderator',
+  onPress: async (_event, context) => {
+    try {
+      await requireModerator(context);
+      const name = await subredditName(context);
+
+      if (name.toLowerCase() === SOURCE_SUBREDDIT) throw new Error(`The Backtest only runs outside r/${SOURCE_SUBREDDIT}.`);
+      const existing = await context.redis.get(keys.post);
+      const post = existing ? await context.reddit.getPostById(existing).catch(() => undefined) : undefined;
+
+      if (post && !post.removed) return context.ui.navigateTo(post);
+      const created = await context.reddit.submitCustomPost({ subredditName: name, title: 'Rule Watch Backtest', entry: 'default' });
+      await context.redis.set(keys.post, created.id);
+      context.ui.navigateTo(created);
+    } catch (error) {
+      diagnosticFailure('backtest_open_failed', failureMetadata.parse(error), failureReason.parse(error));
       context.ui.showToast(failureDisplay.parse(error));
     }
   },

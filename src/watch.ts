@@ -1,8 +1,9 @@
 import type { TriggerContext } from '@devvit/public-api';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { assess, type Evidence } from './decisions.js';
+import { assess, liveQuestions } from './decisions.js';
 import { diagnosticFailure, failureMetadata, failureReason } from './diagnostics.js';
+import { buildEvidence, isExcludedAuthor, isGone } from './evidence.js';
 import { RULE_VERSION, ruleLabel, rules, type RuleName } from './rules.js';
 import { reportingRules } from './stats.js';
 import { RETENTION_MS, saveAssessment, type Assessment } from './storage.js';
@@ -52,10 +53,6 @@ async function overDailyCap(now: number, context: TriggerContext): Promise<boole
   return count > (await context.settings.get<number>('daily-report-cap') ?? 20);
 }
 
-function isGone(item: { removed: boolean; spam: boolean; body?: string | undefined }): boolean {
-  return item.removed || item.spam || ['[deleted]', '[removed]'].includes(item.body ?? '');
-}
-
 async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerContext): Promise<void> {
   const item = kind === 'post'
     ? await context.reddit.getPostById(id)
@@ -63,13 +60,12 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
 
   if (item.subredditId !== context.subredditId) throw new Error('Wrong subreddit');
 
-  if (isGone(item) || ['automoderator', context.appSlug.toLowerCase(), '[deleted]'].includes(item.authorName.toLowerCase())) {
+  if (isGone(item) || isExcludedAuthor(item.authorName, context.appSlug)) {
     console.log('[rule-watch] excluded_content', { id });
 
     return;
   }
 
-  const comment = 'parentId' in item ? item : undefined;
   const post = 'title' in item ? item : await context.reddit.getPostById(item.postId);
   const body = item.body ?? '';
 
@@ -104,40 +100,9 @@ async function evaluate(kind: 'post' | 'comment', id: string, context: TriggerCo
 
   if (!key) throw new Error('OpenAI key is not configured');
 
-  const evidence: Evidence = {
-    target: { kind, body: body.slice(0, 12_000) },
-    context: { parents: [], truncated: body.length > 12_000 || post.title.length > 500 },
-    verifiedWorkThread: workTitle ? await isWorkThread(post, workTitle, context) : false,
-  };
-
-  if (kind === 'post') evidence.target.title = post.title.slice(0, 500);
-
-  if (kind === 'comment') {
-    const postBody = post.removed || post.spam ? '' : post.body ?? '';
-    evidence.context.post = { title: post.title.slice(0, 500), body: postBody.slice(0, 6_000) };
-    evidence.context.truncated ||= postBody.length > 6_000;
-    let parentId = comment!.parentId;
-
-    for (let depth = 0; depth < 3 && parentId.startsWith('t1_'); depth++) {
-      try {
-        const parent = await context.reddit.getCommentById(parentId);
-
-        if (!isGone(parent)) {
-          evidence.context.parents.unshift({ body: parent.body.slice(0, 3_000), author: parent.authorName });
-          evidence.context.truncated ||= parent.body.length > 3_000;
-        }
-
-        parentId = parent.parentId;
-      } catch {
-        evidence.context.truncated = true;
-        break;
-      }
-    }
-
-    evidence.context.truncated ||= parentId.startsWith('t1_');
-  }
-
-  const scores = await assess(key, evidence, workTitle !== '');
+  const verifiedWorkThread = workTitle ? await isWorkThread(post, workTitle, context) : false;
+  const evidence = await buildEvidence(item, post, verifiedWorkThread, (parentId) => context.reddit.getCommentById(parentId));
+  const scores = await assess(key, evidence, liveQuestions(workTitle !== ''));
   const flagged = rules.filter((rule) => (scores[rule.name] ?? -1) >= thresholds[rule.name]!).map((rule) => rule.name);
   const assessedAt = Date.now();
 

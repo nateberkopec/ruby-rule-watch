@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title></title>
+<link rel="stylesheet" href="backtest.css">
+</head>
+<body>
+<div class="app">
+  <p class="status" id="status" role="status"></p>
+  <div class="intro">
+    <p data-i18n="intro.body"></p>
+    <ol id="steps"></ol>
+  </div>
+  <div class="rule-row">
+    <label for="rule" data-i18n="rule.label"></label>
+    <select id="rule"></select>
+  </div>
+  <div class="wordings" id="wordings"></div>
+  <p class="shared" id="shared"></p>
+  <div class="editor" id="editor">
+    <textarea id="wording" data-i18n-label="editor.label"></textarea>
+    <div class="editor-actions">
+      <button class="btn primary" id="rescore" type="button"></button>
+      <button class="btn" id="cancel" type="button" data-i18n="editor.cancel"></button>
+      <div class="progress" id="progress"><div></div></div>
+      <span id="progress-label" class="below"></span>
+    </div>
+  </div>
+
+  <p class="headline" id="headline"></p>
+  <div class="strip">
+    <div class="bars" id="bars"></div>
+    <div class="cut" id="cut"><span id="cut-label"></span></div>
+    <input type="range" id="threshold" min="0.5" max="0.99" step="0.01" value="0.95" data-i18n-label="chart.thresholdLabel">
+    <div class="focus-ring"></div>
+    <div class="axis" id="axis"></div>
+  </div>
+  <p class="below" id="below"></p>
+
+  <div class="meter">
+    <div class="meter-track"><div class="meter-fill" id="meter-fill"></div><div class="meter-target" data-i18n-title="meter.target"></div></div>
+    <p id="meter-text"></p>
+  </div>
+
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <p class="tab-note" id="tab-note"></p>
+  <ul class="items" id="items"></ul>
+  <p class="keys" data-i18n="keys.hint"></p>
+</div>
+<script type="module" src="backtest.js"></script>
+</body>
+</html>

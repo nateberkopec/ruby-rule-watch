@@ -12,7 +12,9 @@
       "onCommentUpdate",
       "onModAction",
       "onAppInstall",
-      "onAppUpgrade"
+      "onAppUpgrade",
+      "onPostDelete",
+      "onCommentDelete"
     ]
   },
   "scheduler": {
@@ -30,5 +32,25 @@
   },
   "dev": {
     "subreddit": "ruby_moderation_n_dev"
+  },
+  "post": {
+    "dir": "public",
+    "entrypoints": {
+      "default": {
+        "entry": "launch.html",
+        "height": "regular"
+      },
+      "backtest": {
+        "entry": "index.html",
+        "height": "tall"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "scripts": {
+    "build": "npm run build:backtest"
   }
 }
