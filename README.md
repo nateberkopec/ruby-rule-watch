@@ -2,7 +2,7 @@
 
 A [Devvit](https://developers.reddit.com/) app that checks new and edited /r/ruby posts and comments against the subreddit's rules using OpenAI's Decisions API (`gpt-6-luna`), and reports likely violations to the mod queue for a human to review. It never removes, approves, locks or bans anything, never replies publicly and never messages anyone.
 
-It is published unlisted on Reddit as `ruby-moderation-noti`. On /r/ruby, processing is on and only the Harassment free rule files reports, capped at 20 a day. The other four rules are assessed and counted, but don't report.
+It is published unlisted on Reddit as `ruby-moderation-noti`. On /r/ruby, processing is on and the Harassment free and No recruiter or work posts rules file reports, capped at 20 a day. The other three rules are assessed and counted, but don't report.
 
 - Privacy policy: https://nateberkopec.github.io/ruby-rule-watch/privacy/
 - Terms: https://nateberkopec.github.io/ruby-rule-watch/terms/
