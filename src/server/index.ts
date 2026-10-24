@@ -2,9 +2,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { context, createServer, getServerPort, reddit, redis, scheduler } from '@devvit/web/server';
 import { z } from 'zod';
 import {
-  BACKTEST_RETENTION_MS, CORPUS_SIZE, SOURCE_SUBREDDIT, corpusComplete, corpusItems, keys, kickBacktest,
-  liveWording, readCorpus, readQueue, readRewrites, readScores, removedItems, ruleName, saveQueue,
-  saveRewrites, wordingId, type RemovedItem,
+  BACKTEST_RETENTION_MS, CORPUS_SIZE, corpusComplete, corpusItems, keys, kickBacktest,
+  liveWording, readCorpus, readQueue, readRewrites, readScores, ruleName, saveQueue,
+  saveRewrites, wordingId,
 } from '../backtest-store.js';
 import { diagnosticFailure, failureDisplay, failureReason } from '../diagnostics.js';
 import { evaluationInstructions, rules } from '../rules.js';
@@ -48,8 +48,7 @@ function isCommentId(id: string): id is `t1_${string}` {
 
 async function state() {
   const corpus = await readCorpus(redis);
-  const removed = await removedItems(redis.global);
-  const ids = [...corpus ? corpusItems(corpus) : [], ...removed.map((item) => item.id)];
+  const ids = corpus ? corpusItems(corpus) : [];
   const live = Object.fromEntries(rules.map((rule) => [rule.name, liveWording(rule.name)]));
   const firstLive = live[rules[0].name]!.id;
   let queue = await readQueue(redis);
@@ -71,7 +70,7 @@ async function state() {
     for (const version of versions) scores[version.id] = await readScores(version.id, redis);
   }
 
-  const total = corpus && corpusComplete(corpus) ? ids.length : CORPUS_SIZE + removed.length;
+  const total = corpus && corpusComplete(corpus) ? ids.length : CORPUS_SIZE;
 
   const judgments = Object.fromEntries(Object.entries(await redis.hGetAll(keys.judgments)).flatMap(([key, value]) => {
     const [verdict, at] = value.split(':');
@@ -80,7 +79,7 @@ async function state() {
   }));
 
   return {
-    items: [...(corpus ? corpusItems(corpus) : []).map((id) => ({ id })), ...removed.map((item) => ({ id: item.id, reason: item.reason ?? '' }))],
+    items: ids.map((id) => ({ id })),
     rules: wordings,
     shared: evaluationInstructions,
     scores,
@@ -141,25 +140,10 @@ async function liveText(id: string) {
   return { id, kind: 'comment', author: comment.authorName, body: comment.body, parent, permalink: permalink(comment.permalink) };
 }
 
-async function removedText(record: RemovedItem) {
-  const { target, context: around } = record.evidence;
-  const current = await liveText(record.id).catch(() => undefined);
-
-  return {
-    id: record.id, kind: target.kind, author: current?.author ?? '', title: target.title, body: target.body,
-    parent: around.parents.at(-1)?.body ?? around.post?.title,
-    permalink: current?.permalink ?? `https://www.reddit.com/r/${SOURCE_SUBREDDIT}/`,
-  };
-}
-
 async function text({ ids }: z.infer<typeof textRequest>) {
-  const records = (await removedItems(redis.global)).filter((record) => ids.includes(record.id));
-
   return Promise.all(ids.map(async (id) => {
-    const record = records.find((entry) => entry.id === id);
-
     try {
-      return record ? await removedText(record) : await liveText(id);
+      return await liveText(id);
     } catch {
       return { id, unavailable: true };
     }

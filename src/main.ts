@@ -2,7 +2,6 @@ import { Devvit, type Context } from '@devvit/public-api';
 import { z } from 'zod';
 import { backtestTick } from './backtest.js';
 import { BACKTEST_JOB, SOURCE_SUBREDDIT, keys } from './backtest-store.js';
-import { attachReason, continueBackfill, forgetRemoved, isHumanModerator, keepRemoved, startBackfill } from './removals.js';
 import { rules } from './rules.js';
 import { diagnosticFailure, failureDisplay, failureMetadata, failureReason } from './diagnostics.js';
 import { statsRows } from './stats.js';
@@ -77,37 +76,16 @@ Devvit.addTrigger({
   event: 'ModAction',
   onEvent: async (event, context) => {
     const outcome = outcomeOf(event.action);
+    const moderator = event.moderator?.name.toLowerCase() ?? '';
     const id = event.action?.endsWith('comment') ? event.targetComment?.id : event.targetPost?.id;
 
-    if (!id || !isHumanModerator(event.moderator?.name ?? '', context.appSlug)) return;
-
-    if (event.action === 'addremovalreason') return attachReason(event.targetComment?.id || id, context);
-
-    if (!outcome) return;
+    if (!outcome || !id || ['automoderator', context.appSlug.toLowerCase(), ''].includes(moderator)) return;
     const recorded = await recordOutcome(id, outcome, context);
     console.log('[rule-watch] mod_action', { id, outcome, recorded });
-
-    try {
-      if (outcome === 'approved') await forgetRemoved(id, context);
-      else await keepRemoved(id, Date.now(), undefined, context);
-    } catch (error) {
-      diagnosticFailure('removed_item_failed', failureMetadata.parse(error), failureReason.parse(error));
-    }
-  },
-});
-
-Devvit.addTrigger({
-  events: ['PostDelete', 'CommentDelete'],
-  onEvent: async (event, context) => {
-    const id = event.type === 'PostDelete' ? event.postId : event.commentId;
-    const prefix = event.type === 'PostDelete' ? 't3_' : 't1_';
-    await forgetRemoved(id.startsWith(prefix) ? id : `${prefix}${id}`, context);
   },
 });
 
 Devvit.addSchedulerJob({ name: 'expire-assessment-index', onRun: async (_event, context) => cleanup(context) });
-
-Devvit.addSchedulerJob({ name: 'backfill-removals', onRun: async (_event, context) => continueBackfill(context) });
 
 Devvit.addSchedulerJob({ name: BACKTEST_JOB, onRun: async (_event, context) => backtestTick(context) });
 
@@ -128,7 +106,6 @@ Devvit.addTrigger({
     }
 
     if (!scheduled) await context.scheduler.runJob({ name: 'expire-assessment-index', cron: '0 0 * * *' });
-    await startBackfill(context);
   },
 });
 

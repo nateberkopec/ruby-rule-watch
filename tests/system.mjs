@@ -72,7 +72,6 @@ const context = {
 
       return entries.slice(start, stop === -1 ? undefined : stop + 1);
     },
-    zRem: async (key, members) => members.reduce((count, member) => count + Number(state.indexes.get(key)?.delete(member) ?? false), 0),
     zRemRangeByScore: async (key, min, max) => {
       const index = state.indexes.get(key) ?? new Map();
 
@@ -113,8 +112,6 @@ const context = {
     cancelJob: async (id) => { state.jobs = state.jobs.filter((job) => job.id !== id); },
   },
 };
-
-context.redis.global = context.redis;
 
 const devvit = {
   configure: () => {}, addSettings: (settings) => state.settingDefinitions.push(...settings),

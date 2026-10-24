@@ -63,22 +63,16 @@
   "tabs": {
     "judge": "To judge ({count})",
     "judged": "Judged ({count})",
-    "changed": "Different from live wording ({count})",
-    "removals": "Catches mod removals? ({caught} of {count})"
+    "changed": "Different from live wording ({count})"
   },
   "notes": {
     "judge": "Highest scores first.",
-    "changed": "Compared with the live wording at {threshold}. Only newly flagged items need judging; your earlier judgments carry over.",
-    "removals": {
-      "one": "This is the {count} post or comment a moderator removed from r/ruby in the last 30 days. At {threshold}, this wording would have reported {caught} of them. \"Would have missed\" means a mod had to find it without Rule Watch's help.",
-      "other": "These are the {count} posts and comments a moderator removed from r/ruby in the last 30 days. At {threshold}, this wording would have reported {caught} of them. \"Would have missed\" means a mod had to find it without Rule Watch's help."
-    }
+    "changed": "Compared with the live wording at {threshold}. Only newly flagged items need judging; your earlier judgments carry over."
   },
   "empty": {
     "judge": "Every flag at {threshold} is judged. Lower the threshold to see what else would be flagged.",
     "judged": "Nothing judged yet. Open \"To judge\" and press Y or N on each flag.",
-    "changed": "This wording flags exactly the same items at {threshold}.",
-    "removals": "No mod removals collected yet."
+    "changed": "This wording flags exactly the same items at {threshold}."
   },
   "item": {
     "post": "Post by {author}",
@@ -94,10 +88,7 @@
   },
   "tags": {
     "newlyFlagged": "Newly flagged",
-    "noLongerFlagged": "No longer flagged",
-    "wouldHaveFlagged": "Would have flagged",
-    "wouldHaveMissed": "Would have missed",
-    "reason": "Removal reason: {reason}"
+    "noLongerFlagged": "No longer flagged"
   },
   "keys": {
     "hint": "Keys: Y worth a look, N not worth it, J and K to move."

@@ -12,9 +12,7 @@
       "onCommentUpdate",
       "onModAction",
       "onAppInstall",
-      "onAppUpgrade",
-      "onPostDelete",
-      "onCommentDelete"
+      "onAppUpgrade"
     ]
   },
   "scheduler": {

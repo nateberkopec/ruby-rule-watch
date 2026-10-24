@@ -9,17 +9,15 @@ const decisionResponse = z.object({
   ])),
 });
 
-export const evidence = z.object({
-  target: z.object({ kind: z.enum(['post', 'comment']), title: z.string().optional(), body: z.string() }),
-  context: z.object({
-    post: z.object({ title: z.string(), body: z.string() }).optional(),
-    parents: z.array(z.object({ body: z.string(), author: z.string() })),
-    truncated: z.boolean(),
-  }),
-  verifiedWorkThread: z.boolean(),
-});
-
-export type Evidence = z.infer<typeof evidence>;
+export type Evidence = {
+  target: { kind: 'post' | 'comment'; title?: string; body: string };
+  context: {
+    post?: { title: string; body: string };
+    parents: { body: string; author: string }[];
+    truncated: boolean;
+  };
+  verifiedWorkThread: boolean;
+};
 
 export type Question<Name extends string> = { name: Name; instructions: string };
 

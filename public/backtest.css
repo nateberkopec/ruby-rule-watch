@@ -6,7 +6,6 @@
   --ruby: #a3172e;
   --ruby-soft: #f6e3e6;
   --keep: #2e7356;
-  --keep-soft: #e2f0e9;
   --slate: #7a808c;
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
   --serif: Charter, "Iowan Old Style", "Bitstream Charter", Georgia, serif;
@@ -86,8 +85,6 @@ select, .btn { font: inherit; color: var(--ink); background: #fff; border: 1px s
 .tag { font-size: 11px; border-radius: 4px; padding: 1px 6px; background: var(--line); color: var(--ink); }
 .tag.new { background: var(--ruby-soft); color: var(--ruby); }
 .tag.dropped { background: #eceef2; color: var(--slate); }
-.tag.caught { background: var(--keep-soft); color: var(--keep); }
-.tag.missed { background: var(--ruby-soft); color: var(--ruby); }
 .parent { margin: 6px 0 0; padding-left: 10px; border-left: 2px solid var(--line); color: var(--muted); font: 14px/1.5 var(--serif); }
 .title { margin: 6px 0 0; font: 600 16px/1.35 var(--serif); }
 .text { margin: 6px 0 0; font: 15.5px/1.55 var(--serif); }

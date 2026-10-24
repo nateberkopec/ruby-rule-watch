@@ -1,7 +1,7 @@
 import type { Comment, Listing, Post, TriggerContext } from '@devvit/public-api';
 import {
   CORPUS_SIZE, SOURCE_SUBREDDIT, corpusComplete, corpusItems, expiresAt, keys, kickBacktest, liveWording,
-  readCorpus, readQueue, readRewrites, removedItems, saveCorpus, saveQueue, type Corpus, type Task,
+  readCorpus, readQueue, readRewrites, saveCorpus, saveQueue, type Corpus, type Task,
 } from './backtest-store.js';
 import { assess, type Evidence } from './decisions.js';
 import { diagnosticFailure, failureDisplay, failureMetadata, failureReason } from './diagnostics.js';
@@ -95,13 +95,10 @@ async function work(context: TriggerContext, deadline: number): Promise<void> {
     await pool(items, deadline, (id) => threadEvidence(id, thread, verified, context).then((evidence) => score(id, evidence)));
   }
 
-  const removed = (await removedItems(context.redis.global)).filter((item) => !scored.has(item.id));
-  await pool(removed, deadline, (item) => score(item.id, item.evidence));
-
   if (Date.now() > deadline) return;
   const remaining = new Set(Object.keys(await context.redis.hGetAll(keys.scores(questions[0]!.wordingId))));
 
-  if (corpusItems(corpus).some((id) => !remaining.has(id)) || removed.some((item) => !remaining.has(item.id))) return;
+  if (corpusItems(corpus).some((id) => !remaining.has(id))) return;
   await saveQueue(queue.slice(1), context.redis);
   console.log('[rule-watch] backtest_task_done', { wordingId: task.wordingId, live: !task.rule });
 }

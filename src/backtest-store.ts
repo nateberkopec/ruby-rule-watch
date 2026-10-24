@@ -1,7 +1,6 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { z } from 'zod';
-import { evidence } from './decisions.js';
 import { evaluationInstructions, rules, type RuleName } from './rules.js';
 
 export const SOURCE_SUBREDDIT = 'ruby';
@@ -31,16 +30,6 @@ const wording = z.object({ id: z.string(), text: z.string() });
 
 export type Wording = z.infer<typeof wording>;
 
-export const removedItem = z.object({
-  id: z.string(),
-  subreddit: z.string(),
-  removedAt: z.number(),
-  reason: z.string().optional(),
-  evidence,
-});
-
-export type RemovedItem = z.infer<typeof removedItem>;
-
 export const keys = {
   corpus: 'backtest:corpus',
   queue: 'backtest:queue',
@@ -53,21 +42,10 @@ export const keys = {
   scores: (wordingId: string) => `backtest:scores:${wordingId}`,
 };
 
-export const globalKeys = {
-  removed: 'removed',
-  record: (id: string) => `removed:${id}`,
-  sources: (id: string) => `removed-source:${id}`,
-};
-
 type Store = {
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string, options?: { nx?: boolean; expiration?: Date }): Promise<string>;
   hGetAll(key: string): Promise<Record<string, string>>;
-};
-
-type GlobalStore = {
-  zRange(key: string, start: number, stop: number, options: { by: 'rank' }): Promise<{ member: string; score: number }[]>;
-  mGet(keys: string[]): Promise<(string | null)[]>;
 };
 
 type Scheduler = { runJob(job: { name: string; runAt: Date }): Promise<string> };
@@ -130,17 +108,4 @@ export async function readScores(id: string, store: Store): Promise<Record<strin
   const raw = await store.hGetAll(keys.scores(id));
 
   return Object.fromEntries(Object.entries(raw).map(([item, value]) => [item, value === 'failed' ? -1 : Number(value)]));
-}
-
-export async function removedItems(store: GlobalStore): Promise<RemovedItem[]> {
-  const entries = await store.zRange(globalKeys.removed, 0, -1, { by: 'rank' }).catch((error: Error) => {
-    if (error.message.includes('global redis is not supported')) return [];
-    throw error;
-  });
-
-  if (!entries.length) return [];
-  const values = await store.mGet(entries.map((entry) => globalKeys.record(entry.member)));
-
-  return values.flatMap((value) => value ? [removedItem.parse(JSON.parse(value))] : [])
-    .filter((item) => item.subreddit === SOURCE_SUBREDDIT && item.removedAt > Date.now() - BACKTEST_RETENTION_MS);
 }

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { escape, list, loadMessages, scores as scoreFormat, t, translateStatic } from './i18n.js';
 
 const serverState = z.object({
-  items: z.array(z.object({ id: z.string(), reason: z.string().optional() })),
+  items: z.array(z.object({ id: z.string() })),
   rules: z.array(z.object({
     name: z.string(),
     label: z.string(),
@@ -78,9 +78,6 @@ const current = () => versions().find((version) => version.id === ui.active.get(
 
 const live = () => current().live ? undefined : versions()[0];
 
-const publicItems = () => data.items.filter((item) => item.reason === undefined);
-
-const removedItems = () => data.items.filter((item) => item.reason !== undefined);
 
 const judgmentKey = (id: string) => `${ui.rule}:${id}`;
 
@@ -91,11 +88,11 @@ const isJudged = (id: string) => judgmentKey(id) in data.judgments;
 const scoreOf = (item: Item, version: Version = current()) => data.scores[version.id]?.[item.id] ?? -1;
 
 function flagged(version: Version = current()): Item[] {
-  return publicItems().filter((item) => scoreOf(item, version) >= ui.threshold).sort((a, b) => scoreOf(b, version) - scoreOf(a, version));
+  return data.items.filter((item) => scoreOf(item, version) >= ui.threshold).sort((a, b) => scoreOf(b, version) - scoreOf(a, version));
 }
 
 function scoredCount(version: Version = current()): number {
-  return publicItems().filter((item) => scoreOf(item, version) >= 0).length;
+  return data.items.filter((item) => scoreOf(item, version) >= 0).length;
 }
 
 function changes() {
@@ -138,7 +135,7 @@ function renderStatus(): void {
 }
 
 function renderWordings(): void {
-  const total = publicItems().length;
+  const total = data.items.length;
 
   $('wordings').innerHTML = versions().map((version, index) => {
     const active = version.id === current().id;
@@ -160,7 +157,7 @@ function renderWordings(): void {
 }
 
 function renderEditor(): void {
-  const total = publicItems().length + removedItems().length;
+  const total = data.items.length;
   const waiting = Boolean(liveTask());
   const task = data.queue.find((entry) => entry.wordingId === ui.awaiting);
   rescoreButton.textContent = waiting ? t('editor.waitForLive') : t('editor.score', { total });
@@ -174,7 +171,7 @@ function renderStrip(): void {
   const bins = Array<number>(50).fill(0);
   let below = 0;
 
-  for (const item of publicItems()) {
+  for (const item of data.items) {
     const score = scoreOf(item);
 
     if (score < 0) continue;
@@ -215,13 +212,8 @@ function renderMeter(): void {
     : t('meter.empty');
 }
 
-function removals() {
-  return removedItems().sort((a, b) => scoreOf(b) - scoreOf(a));
-}
-
 function renderTabs(): void {
   const all = flagged();
-  const removed = removals();
 
   const tabs: [string, string][] = [
     ['judge', t('tabs.judge', { count: all.filter((item) => !isJudged(item.id)).length })],
@@ -232,8 +224,6 @@ function renderTabs(): void {
     const { added, dropped } = changes();
     tabs.push(['changed', t('tabs.changed', { count: added.length + dropped.length })]);
   }
-
-  tabs.push(['removed', t('tabs.removals', { caught: removed.filter((item) => scoreOf(item) >= ui.threshold).length, count: removed.length })]);
 
   if (!tabs.some(([key]) => key === ui.tab)) ui.tab = 'judge';
   $('tabs').innerHTML = tabs.map(([key, label]) => `<button type="button" role="tab" data-tab="${key}" aria-selected="${key === ui.tab}">${escape(label)}</button>`).join('');
@@ -255,23 +245,22 @@ function itemBody(item: Item): string {
   return `${parent}${title}<p class="text">${escape(text.body)}</p>`;
 }
 
-function itemRow(item: Item, labels = '', judgeable = true): string {
+function itemRow(item: Item, labels = ''): string {
   const score = scoreOf(item);
   const verdict = judgmentOf(item.id);
   const text = texts.get(item.id);
   const kind = item.id.startsWith('t3_') ? 'post' : 'comment';
   const author = text && !('unavailable' in text) && text.author ? `u/${text.author}` : '';
   const replying = kind === 'comment' && text && !('unavailable' in text) && text.parent;
-  const reason = item.reason ? tag('', t('tags.reason', { reason: item.reason })) : '';
 
   return `<li class="item" tabindex="0" data-id="${item.id}">
     <div class="score ${score < ui.threshold ? 'under' : ''}">${fmt(Math.max(0, score))}<small>${escape(t(score >= ui.threshold ? 'item.flagged' : 'item.notFlagged'))}</small></div>
     <div>
-      <div class="meta"><span>${escape(t(kind === 'post' ? 'item.post' : 'item.comment', { author }))}</span>${replying ? `<span>${escape(t('item.replyingTo'))}</span>` : ''}${labels}${reason}</div>
+      <div class="meta"><span>${escape(t(kind === 'post' ? 'item.post' : 'item.comment', { author }))}</span>${replying ? `<span>${escape(t('item.replyingTo'))}</span>` : ''}${labels}</div>
       ${itemBody(item)}
       <div class="verdict">
-        ${judgeable ? `<button type="button" class="yes" data-judge="yes" aria-pressed="${verdict === 'yes'}">${escape(t('item.worth'))}<kbd>Y</kbd></button>
-        <button type="button" class="no" data-judge="no" aria-pressed="${verdict === 'no'}">${escape(t('item.notWorth'))}<kbd>N</kbd></button>` : ''}
+        <button type="button" class="yes" data-judge="yes" aria-pressed="${verdict === 'yes'}">${escape(t('item.worth'))}<kbd>Y</kbd></button>
+        <button type="button" class="no" data-judge="no" aria-pressed="${verdict === 'no'}">${escape(t('item.notWorth'))}<kbd>N</kbd></button>
         ${text && !('unavailable' in text) ? `<a href="${escape(text.permalink)}" data-open="${escape(text.permalink)}">${escape(t('item.open'))}</a>` : ''}
       </div>
     </div>
@@ -297,7 +286,7 @@ function renderItems(): void {
     rows = all.filter((item) => isJudged(item.id)).map((item) => itemRow(item));
 
     if (!rows.length) rows = [emptyRow('empty.judged')];
-  } else if (ui.tab === 'changed') {
+  } else {
     const { added, dropped } = changes();
     note = t('notes.changed', { threshold });
 
@@ -307,16 +296,6 @@ function renderItems(): void {
     ];
 
     if (!rows.length) rows = [emptyRow('empty.changed', { threshold })];
-  } else {
-    const removed = removals();
-    const caught = removed.filter((item) => scoreOf(item) >= ui.threshold).length;
-    note = removed.length ? t('notes.removals', { count: removed.length, caught, threshold }) : '';
-
-    rows = removed.map((item) => itemRow(item, scoreOf(item) >= ui.threshold
-      ? tag('caught', t('tags.wouldHaveFlagged'))
-      : tag('missed', t('tags.wouldHaveMissed')), false));
-
-    if (!rows.length) rows = [emptyRow('empty.removals')];
   }
 
   $('tab-note').textContent = note;

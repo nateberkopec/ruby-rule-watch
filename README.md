@@ -46,8 +46,6 @@ Actions by AutoModerator and the app are ignored, and flags nobody acts on don't
 
 Scoring runs as a chain of short scheduler jobs, because Devvit stops each request after about 30 seconds. The first run takes a while; the page shows progress and can be closed.
 
-The **Catches mod removals?** tab lists posts and comments /r/ruby moderators removed or spammed in the last 30 days, with the removal reason if one was given, and whether each wording would have flagged them. The /r/ruby installation keeps a copy of their text for this, in Redis storage shared by all of the app's installations. The copy is deleted after 30 days, when the item is approved, or when it or any post or comment quoted in it is deleted.
-
 To get a push notification for each report, a moderator can open Reddit's notification settings → Mod notifications → the subreddit → Reports, turn on Advanced Setup for Posts and Comments, and set the slider to 1 report.
 
 ## Installation settings
@@ -66,7 +64,7 @@ The OpenAI key is an app-wide secret, set with `devvit-cli settings set openai-a
 
 The app sends post and comment text to `api.openai.com`, its only outside domain: the title (up to 500 characters), the body (up to 12,000), and for comments the parent post (up to 6,000) and up to three earlier comments (up to 3,000 each, with their authors' usernames). It never reads account history, modmail, images, video or linked pages.
 
-Redis stores content IDs, permalinks, content digests, scores, flags, report status and moderator outcomes, and no moderator names. The only post and comment text it stores is the copy of removed items described under Backtest. Everything expires after 30 days, and a daily job prunes the index. Logs contain IDs and error details, not content.
+Redis stores content IDs, permalinks, content digests, scores, flags, report status and moderator outcomes, but no post or comment text and no moderator names. Everything expires after 30 days, and a daily job prunes the index. Logs contain IDs and error details, not content.
 
 See the privacy policy for the full description, including OpenAI's retention.
 
@@ -85,7 +83,7 @@ mise exec -- hk install
 |---|---|
 | `mise run lint` | TypeScript, [AntiSlop](tools/oxlint/anti-slop/UPSTREAM.md) oxlint rules, a gitleaks scan and jactionlint |
 | `mise run test` | The system test: every trigger, menu, form and scheduler job against simulated Reddit, Redis and OpenAI. No network calls |
-| `mise run build` | Builds the Backtest page and server, bundles the actor into `dist/` and checks it advertises all eleven event handlers and the scheduler |
+| `mise run build` | Builds the Backtest page and server, bundles the actor into `dist/` and checks it advertises all nine event handlers and the scheduler |
 
 hk runs lint and test before each commit. GitHub Actions runs lint, test and build on every push and pull request. There is no `serve` task: running the app means installing it on a subreddit.
 
@@ -95,7 +93,6 @@ Layout:
 src/main.ts           settings, triggers, scheduler jobs and the mod menu
 src/watch.ts          assessment and reporting
 src/evidence.ts       the text and context sent to OpenAI
-src/removals.ts       copies of removed items for the Backtest
 src/backtest.ts       Backtest scoring job
 src/backtest-store.ts Backtest Redis keys and records
 src/server/           Backtest web server
@@ -117,9 +114,9 @@ docs/                 GitHub Pages site: privacy policy and terms
 ## Releasing
 
 ```fish
-mise exec -- devvit-cli publish --version 0.0.15
-mise exec -- devvit-cli install ruby_moderation_n_dev ruby-moderation-noti@0.0.15
-mise exec -- devvit-cli install ruby ruby-moderation-noti@0.0.15
+mise exec -- devvit-cli publish --version 0.0.16
+mise exec -- devvit-cli install ruby_moderation_n_dev ruby-moderation-noti@0.0.16
+mise exec -- devvit-cli install ruby ruby-moderation-noti@0.0.16
 mise exec -- devvit-cli logs ruby ruby-moderation-noti --since 10m
 ```
 
