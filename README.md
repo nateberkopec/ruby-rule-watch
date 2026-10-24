@@ -112,9 +112,9 @@ docs/                 GitHub Pages site: privacy policy and terms
 ## Releasing
 
 ```fish
-mise exec -- devvit-cli publish --version 0.0.17
-mise exec -- devvit-cli install ruby_moderation_n_dev ruby-moderation-noti@0.0.17
-mise exec -- devvit-cli install ruby ruby-moderation-noti@0.0.17
+mise exec -- devvit-cli publish --version 0.0.18
+mise exec -- devvit-cli install ruby_moderation_n_dev ruby-moderation-noti@0.0.18
+mise exec -- devvit-cli install ruby ruby-moderation-noti@0.0.18
 mise exec -- devvit-cli logs ruby ruby-moderation-noti --since 10m
 ```
 
