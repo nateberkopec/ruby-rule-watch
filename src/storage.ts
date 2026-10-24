@@ -1,12 +1,9 @@
 import type { TriggerContext } from '@devvit/public-api';
 import { z } from 'zod';
-import { rules } from './rules.js';
 
 export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const INDEX = 'assessments';
-
-const ruleName = z.enum(rules.map((rule) => rule.name));
 
 const assessment = z.object({
   id: z.string(),
@@ -15,8 +12,8 @@ const assessment = z.object({
   permalink: z.url(),
   assessedAt: z.number(),
   configuration: z.string(),
-  scores: z.partialRecord(ruleName, z.number().min(0).max(1)),
-  flagged: z.array(ruleName),
+  scores: z.record(z.string(), z.number().min(0).max(1)),
+  flagged: z.array(z.string()),
   delivery: z.enum(['none', 'suppressed', 'capped', 'reported', 'failed']),
   outcome: z.enum(['removed', 'approved']).optional(),
 });

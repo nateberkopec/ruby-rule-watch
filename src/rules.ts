@@ -1,20 +1,23 @@
-export const RULE_VERSION = '1';
+export const RULE_VERSION = '2';
 
 export const rules = [
   {
-    name: 'harassment',
-    label: 'Harassment free',
-    instructions: 'Does the target contain targeted harassment, threats, discriminatory abuse, or attacks based on age, body size, disability, ethnicity, sex characteristics, gender identity/expression, experience, education, socioeconomic status, nationality, appearance, race, caste, color, religion, or sexual identity/orientation? Protect vulnerable members without treating criticism of discriminatory conduct as equivalent to discrimination. Quoting abuse to condemn it is not itself harassment.',
-  },
-  {
-    name: 'high_standards',
-    label: 'High standards',
-    instructions: 'Does the target exhibit concrete hostility or abusive conduct inconsistent with empathy, respectful disagreement, constructive feedback, responsibility, and community wellbeing? Ordinary brusqueness, brevity, lack of an apology, and failure to explicitly demonstrate empathy or use Non-Violent Communication are not sufficient. Strong substantive criticism is allowed. This interpretation is provisional and should favor clear actionable violations.',
-  },
-  {
-    name: 'productive_disagreement',
-    label: 'Productive disagreement',
-    instructions: 'Does the target contain trolling, insulting or derogatory comments, personal or political attacks, sexualized language/imagery in the available text, or conduct reasonably inappropriate in a professional setting? Also flag willful misrepresentation of another person\'s stated position only when the supplied context provides clear evidence; do not infer intent from disagreement alone. Respectful political discussion is not automatically a political attack. Do not require explicit active-listening phrases or assume someone failed to read a comment.',
+    name: 'civility',
+    label: 'Civility',
+    instructions: [
+      'Does the target:',
+      '- Attack a person, rather than their ideas, code or decisions?',
+      '- Insults them or calls them a derogatory name, or mocks their intelligence, competence, age, experience or background',
+      '- demeans them, or a group, because of age, body size, disability, ethnicity, sex characteristics, gender, identity or expression, education, socioeconomic status, nationality, appearance, race, caste, color, religion, or sexual identity or orientation;',
+      '- threatens them, tells them to harm themselves',
+      '- tries mainly to provoke anger',
+      '- makes sexual remarks inappropriate for a workplace',
+      'Do not flag:',
+      '- blunt, terse, impatient or sarcastic targets',
+      '- harsh criticism, if it does not violate the principles above',
+      '- profanity not aimed at a person',
+      '- quoting abuse in order to condemn',
+    ].join('\n'),
   },
   {
     name: 'language_bashing',

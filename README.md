@@ -2,7 +2,7 @@
 
 A [Devvit](https://developers.reddit.com/) app that checks new and edited /r/ruby posts and comments against the subreddit's rules using OpenAI's Decisions API (`gpt-6-luna`), and reports likely violations to the mod queue for a human to review. It never removes, approves, locks or bans anything, never replies publicly and never messages anyone.
 
-It is published unlisted on Reddit as `ruby-moderation-noti`. On /r/ruby, processing is on and the Harassment free and No recruiter or work posts rules file reports, capped at 20 a day. The other three rules are assessed and counted, but don't report.
+It is published unlisted on Reddit as `ruby-moderation-noti`. On /r/ruby, processing is on and the Civility and No recruiter or work posts rules file reports, capped at 20 a day. No language bashing is assessed and counted, but doesn't report.
 
 - Privacy policy: https://nateberkopec.github.io/ruby-rule-watch/privacy/
 - Terms: https://nateberkopec.github.io/ruby-rule-watch/terms/
@@ -18,11 +18,9 @@ For every post or comment that is submitted or substantively edited, the app:
 
 Whitespace-only edits and duplicate events are ignored. Each item is reported at most once in 30 days, even if it's edited later; edits are still reassessed and counted.
 
-The five rules are defined in `src/rules.ts`:
+The three rules are defined in `src/rules.ts`. They describe what Rule Watch reports, not the subreddit's rules word for word:
 
-- **Harassment free:** targeted harassment, threats and discriminatory abuse.
-- **High standards:** concrete hostility. Ordinary brusqueness doesn't count.
-- **Productive disagreement:** trolling, insults, personal attacks and unprofessional conduct.
+- **Civility:** attacks on a person rather than their ideas or code: insults, demeaning people for who they are, threats, trolling and sexual remarks. Blunt replies, harsh criticism and profanity not aimed at a person don't count.
 - **No language bashing:** derogatory attacks on other languages. Technical criticism is fine.
 - **No recruiter or work posts:** job offers, job-seeking, freelance solicitation and recruiting outside the work thread. Inside the work thread, job ads must be Ruby jobs with the required fields. Career advice and job-market discussion are fine.
 
@@ -99,7 +97,7 @@ src/server/           Backtest web server
 src/client/           Backtest page
 public/               Backtest HTML, CSS and English strings
 src/decisions.ts      OpenAI Decisions API client
-src/rules.ts          the five rule questions
+src/rules.ts          the rule questions
 src/storage.ts        Redis records and retention
 src/stats.ts          stats rows
 src/work-threads.ts   work-thread recognition and title validation
@@ -114,9 +112,9 @@ docs/                 GitHub Pages site: privacy policy and terms
 ## Releasing
 
 ```fish
-mise exec -- devvit-cli publish --version 0.0.16
-mise exec -- devvit-cli install ruby_moderation_n_dev ruby-moderation-noti@0.0.16
-mise exec -- devvit-cli install ruby ruby-moderation-noti@0.0.16
+mise exec -- devvit-cli publish --version 0.0.17
+mise exec -- devvit-cli install ruby_moderation_n_dev ruby-moderation-noti@0.0.17
+mise exec -- devvit-cli install ruby ruby-moderation-noti@0.0.17
 mise exec -- devvit-cli logs ruby ruby-moderation-noti --since 10m
 ```
 
